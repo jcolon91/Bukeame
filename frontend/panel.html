@@ -216,6 +216,7 @@ html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;
 /* Botón flotante de acciones que vive dentro del bloque */
 .tl-fab{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--border);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12);cursor:pointer;z-index:2;transition:transform .1s,background .12s,color .12s}
 .tl-fab svg{width:13px;height:13px;display:block}
+.tl-validate svg{width:15px;height:15px;flex:none}
 .tl-fab:hover,.tl-evt.is-open .tl-fab{background:var(--green);border-color:var(--green);color:var(--green-ink)}
 .tl-evt.is-open .tl-fab{transform:rotate(90deg)}
 .tl-now{position:absolute;left:0;right:0;height:2px;background:var(--mango);z-index:6;pointer-events:none}
@@ -2519,7 +2520,7 @@ function tlOpenPopover(ev){
   // confirma que recibió el pago y la cita pasa de pendiente a aceptada.
   let html = '<h5>'+esc(ev.dataset.name||'Cita')+'</h5>'+
     '<p>'+esc(ev.dataset.when||'')+(svc?(' · '+esc(svc)):'')+'</p>'+
-    (needsValidation ? '<button class="tl-validate" data-act="validate" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:10px;padding:11px;border:none;border-radius:11px;background:#0E8074;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer">'+TL_SVG.done+'<span>Validar depósito y aceptar</span></button>' : '')+
+    (needsValidation ? '<button class="tl-validate" data-act="validate" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;padding:7px 10px;border:none;border-radius:9px;background:#0E8074;color:#fff;font-weight:700;font-size:12px;cursor:pointer;line-height:1.2">'+TL_SVG.done+'<span>Validar depósito y aceptar</span></button>' : '')+
     '<div class="tl-pop-main">'+
       '<button class="tl-m-done" data-act="completed">'+TL_SVG.done+'<span>Completar</span></button>'+
       '<button class="tl-m-move" data-act="move">'+TL_SVG.move+'<span>Mover</span></button>'+
