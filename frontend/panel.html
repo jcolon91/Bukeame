@@ -1040,6 +1040,8 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <button type="button" class="paymethod" data-m="card">Tarjeta</button>
       </div>
     </div>
+    <div class="field"><label>Cobrado ($) *</label><input id="cobroAmt" type="number" step="0.01" min="0" placeholder="0.00">
+      <p style="font-size:12px;color:var(--ink2);margin-top:4px">Ajústalo si cobraste distinto al precio del servicio (trabajo extra, ajuste).</p></div>
     <div class="field"><label>Propina (opcional)</label><input id="cobroTip" type="number" step="0.01" min="0" placeholder="0.00"></div>
     <div style="background:var(--paper);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
       <span style="font-weight:600">Total a cobrar</span>
@@ -3327,14 +3329,17 @@ function openCobro(id, servicio, priceCents){
   cobroId = id; cobroPrice = priceCents; cobroMethod = 'cash';
   clearAlert('cobroAlert');
   document.getElementById('cobroServicio').textContent = servicio + ' — ' + money(priceCents);
+  document.getElementById('cobroAmt').value = (priceCents/100).toFixed(2);
   document.getElementById('cobroTip').value = '';
   document.querySelectorAll('.paymethod').forEach(function(b){ b.classList.toggle('on', b.dataset.m==='cash'); });
   updateCobroTotal();
   cobroModal.classList.add('on');
 }
 function updateCobroTotal(){
+  var amt = parseFloat(document.getElementById('cobroAmt').value);
+  var amtCents = isNaN(amt) ? cobroPrice : Math.round(amt*100);
   var tip = parseFloat(document.getElementById('cobroTip').value) || 0;
-  document.getElementById('cobroTotal').textContent = money(cobroPrice + Math.round(tip*100));
+  document.getElementById('cobroTotal').textContent = money(amtCents + Math.round(tip*100));
 }
 document.querySelectorAll('.paymethod').forEach(function(b){
   b.onclick = function(){
@@ -3344,13 +3349,17 @@ document.querySelectorAll('.paymethod').forEach(function(b){
   };
 });
 document.getElementById('cobroTip').oninput = updateCobroTotal;
+document.getElementById('cobroAmt').oninput = updateCobroTotal;
 document.getElementById('cobroCancel').onclick = function(){ cobroModal.classList.remove('on'); };
 document.getElementById('cobroSave').onclick = async function(){
+  const amtVal = parseFloat(document.getElementById('cobroAmt').value);
+  if(isNaN(amtVal) || amtVal < 0){ showAlert('cobroAlert','Escribe el monto cobrado.',false); return; }
   const btn = this; btn.disabled = true; btn.textContent = 'Guardando…';
   const tip = parseFloat(document.getElementById('cobroTip').value) || 0;
   const r = await api('PATCH','/appointments/'+cobroId, {
     status: 'completed',
     payment_method: cobroMethod,
+    amount_cents: Math.round(amtVal*100),
     tip_cents: Math.round(tip*100)
   });
   btn.disabled = false; btn.textContent = 'Completar y cobrar';
