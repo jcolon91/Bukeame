@@ -269,7 +269,7 @@ app.use((req, res, next) =>
 app.use(rateLimit({ windowMs: 60_000, max: 1000, standardHeaders: true, legacyHeaders: false }));
 const authLimiter   = rateLimit({ windowMs: 15 * 60_000, max: 20,  message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
 // Lockout por cuenta: keyed por email (o IP si no hay email) para frenar fuerza bruta dirigida.
-const loginLimiter  = rateLimit({ windowMs: 15 * 60_000, max: 8, keyGenerator: (req) => (req.body && req.body.email) ? ('em:' + String(req.body.email).toLowerCase().trim()) : req.ip, message: { error: 'Demasiados intentos para esta cuenta. Espera 15 minutos.' } });
+const loginLimiter  = rateLimit({ windowMs: 15 * 60_000, max: 8, keyGenerator: (req) => req.ip + '|' + ((req.body && req.body.email) ? String(req.body.email).toLowerCase().trim() : ''), message: { error: 'Demasiados intentos para esta cuenta. Espera 15 minutos.' } });
 // Refresh con su propio cubo, separado de login, para que rotar no consuma intentos de login.
 const refreshLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60, message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
 const publicLimiter = rateLimit({ windowMs: 60_000,      max: 60,  message: { error: 'Vas muy rápido. Intenta en un minuto.' } });
@@ -412,14 +412,28 @@ const authRequired = asyncH(async (req, res, next) => {
 // Carga el negocio del dueño (multi-tenant scope)
 const businessScope = asyncH(async (req, res, next) => {
   const { rows } = await db.query(
-    `SELECT b.*, s.plan_code, p.max_staff, p.max_appts_month, p.features
+    `SELECT b.*, s.plan_code AS sub_plan, s.status AS sub_status, s.trial_ends_at,
+            p.max_staff, p.max_appts_month, p.features
        FROM businesses b
        JOIN subscriptions s ON s.business_id = b.id
        JOIN plans p ON p.code = s.plan_code
       WHERE b.owner_user_id = $1 AND b.deleted_at IS NULL
       LIMIT 1`, [req.user.id]);
   if (!rows[0]) return bad(res, 'No tienes un negocio registrado todavía', 404);
-  req.business = rows[0];
+  const biz = rows[0];
+  biz.plan_code = biz.sub_plan;
+  // Entitlement: un plan pago SOLO cuenta si la suscripción está vigente. Un trial
+  // vencido o una suscripción cancelada se tratan como FREE para el gating de
+  // funciones (cierra el trial que nunca expira y el uso de funciones sin pagar).
+  const trialExpired = biz.sub_status === 'trialing'
+    && (!biz.trial_ends_at || new Date(biz.trial_ends_at) <= new Date());
+  const notEntitled = biz.plan_code !== 'free' && (biz.sub_status === 'cancelled' || trialExpired);
+  if (notEntitled) {
+    const fp = await db.query(`SELECT max_staff, max_appts_month, features FROM plans WHERE code = 'free'`);
+    biz.plan_code = 'free';
+    if (fp.rows[0]) { biz.max_staff = fp.rows[0].max_staff; biz.max_appts_month = fp.rows[0].max_appts_month; biz.features = fp.rows[0].features; }
+  }
+  req.business = biz;
   next();
 });
 
@@ -2170,16 +2184,16 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
   const method = payment_method === 'card' ? 'card' : 'ath_movil';
   const phoneN = normPhone(phone);
 
-  // ABUSE: tope de reservas SIN PAGAR por cliente en este negocio. Una cita
-  // 'pending_deposit' OCUPA el turno; sin tope, alguien podría inundar todos los
-  // turnos con holds y nunca pagar. Si ya tiene varias pendientes, no deja crear otra
-  // hasta que pague o expiren (el worker las libera a los ~30 min).
-  if (deposit > 0) {
+  // ABUSE: tope de reservas ONLINE activas por cliente (teléfono) en este negocio.
+  // Aplica SIEMPRE (con o sin depósito): sin él, un negocio con depósitos apagados
+  // podía ser inundado de citas fantasma 'confirmed' que ocupan turnos reales.
+  {
     const held = await db.query(
       `SELECT count(*)::int n FROM appointments a JOIN clients c ON c.id = a.client_id
-        WHERE a.business_id = $1 AND a.status = 'pending_deposit' AND c.phone = $2`, [biz.id, phoneN]);
-    if (held.rows[0].n >= 5)
-      return bad(res, 'Tienes varias reservas pendientes de depósito. Págalas o espera a que expiren antes de hacer otra.', 429);
+        WHERE a.business_id = $1 AND c.phone = $2 AND a.source = 'online'
+          AND a.status IN ('pending_deposit','confirmed') AND a.starts_at > now()`, [biz.id, phoneN]);
+    if (held.rows[0].n >= 6)
+      return bad(res, 'Tienes varias reservas activas en este negocio. Cancela alguna o espera antes de hacer otra.', 429);
   }
 
   const client = await db.connect();
@@ -2265,7 +2279,7 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
 app.get('/api/public/appointments/:code', codeLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
     `SELECT a.confirmation_code, a.status, a.starts_at, a.service_name, a.price_cents, a.deposit_cents,
-            a.client_notes, st.display_name AS staff_name,
+            st.display_name AS staff_name,
             b.name AS business_name, b.slug, b.address_line, b.cancellation_hours, b.ath_phone,
             (SELECT json_build_object('method', p.method, 'status', p.status, 'amount_cents', p.amount_cents)
                FROM payments p WHERE p.appointment_id = a.id AND p.kind = 'deposit' LIMIT 1) AS deposit
@@ -2281,14 +2295,25 @@ app.get('/api/public/appointments/:code', codeLimiter, asyncH(async (req, res) =
 app.post('/api/public/appointments/:code/ath-reference', codeLimiter, asyncH(async (req, res) => {
   const { reference } = req.body || {};
   if (!isStr(reference, 60)) return bad(res, 'Referencia requerida');
+  // Solo dispara la alerta al negocio la PRIMERA vez que se reporta (manual_validate
+  // pasa de false→true). Reintentos con el mismo código ya no re-inundan su WhatsApp.
   const { rows } = await db.query(
     `UPDATE payments p SET external_ref = $1, manual_validate = true
        FROM appointments a
       WHERE p.appointment_id = a.id AND p.business_id = a.business_id
         AND a.confirmation_code = $2
         AND p.kind = 'deposit' AND p.method = 'ath_movil' AND p.status = 'pending'
+        AND p.manual_validate = false
       RETURNING a.business_id, a.id, a.service_name`, [reference.trim(), req.params.code.toUpperCase()]);
-  if (!rows[0]) return bad(res, 'Cita o depósito no encontrado', 404);
+  if (!rows[0]) {
+    // Ya reportado antes (idempotente) o no existe un depósito pendiente para ese código.
+    const ex = await db.query(
+      `SELECT 1 FROM payments p JOIN appointments a ON a.id = p.appointment_id
+        WHERE a.confirmation_code = $1 AND p.kind = 'deposit' AND p.status = 'pending' LIMIT 1`,
+      [req.params.code.toUpperCase()]);
+    if (ex.rows[0]) return res.json({ ok: true, message: 'Ya recibimos tu referencia; el negocio la validará.' });
+    return bad(res, 'Cita o depósito no encontrado', 404);
+  }
   await alertDepositToValidate(rows[0].business_id, rows[0].id, `ATH Móvil (ref ${reference.trim()}) · ${rows[0].service_name}`);
   res.json({ ok: true, message: 'El negocio verificará tu pago y la cita quedará confirmada' });
 }));
@@ -2419,6 +2444,16 @@ app.post('/api/public/:slug/appointments/:code/ath/poll', codeLimiter, asyncH(as
   const st = found && found.ecommerceStatus;
   if (st === 'CANCEL') { athDepositPending.delete(ecommerceId); return res.json({ status: 'cancelled' }); }
   if (st !== 'CONFIRM' && st !== 'COMPLETED') return res.json({ status: 'pending' });
+
+  // No captures el depósito si la reserva ya expiró/se canceló (evita cobrar por un
+  // turno que ya no existe y depender de un reembolso manual del negocio).
+  {
+    const a0 = await db.query(`SELECT 1 FROM appointments WHERE id = $1 AND status = 'pending_deposit'`, [pend.appointmentId]);
+    if (!a0.rows[0]) {
+      athDepositPending.delete(ecommerceId);
+      return res.json({ status: 'expired', message: 'La reserva expiró antes de completarse el pago; no se realizó el cobro.' });
+    }
+  }
 
   let fin = found;
   if (st === 'CONFIRM') {
@@ -3378,7 +3413,7 @@ function emailWelcome(name) {
   const text = `Hola ${first},\n\nTu cuenta en Bukeame ya está activa. El próximo paso es crear tu negocio para empezar a recibir citas.\n\nEntra aquí: https://bukeame.com/panel.html\n\n— El equipo de Bukeame`;
   const html = emailShell(`
     <tr><td style="padding:28px 30px 30px 30px">
-      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${first}, tu cuenta ya está activa</h1>
+      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${emailEsc(first)}, tu cuenta ya está activa</h1>
       <p style="margin:0 0 22px 0;font-size:15px;color:#5E594B;line-height:1.6">El próximo paso es crear tu negocio. Configura tus servicios, tu horario y empieza a recibir citas sin llamadas ni mensajes de ida y vuelta.</p>
       <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:#0E8074">
         <a href="https://bukeame.com/panel.html" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:12px">Crear mi negocio</a>
@@ -3393,7 +3428,7 @@ function emailReset(name, link) {
   const text = `Hola ${first},\n\nRecibimos una solicitud para restablecer tu contraseña. Abre este enlace (válido por 1 hora):\n\n${link}\n\nSi no fuiste tú, ignora este correo: tu contraseña sigue igual.\n\n— El equipo de Bukeame`;
   const html = emailShell(`
     <tr><td style="padding:28px 30px 30px 30px">
-      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${first}, restablece tu contraseña</h1>
+      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${emailEsc(first)}, restablece tu contraseña</h1>
       <p style="margin:0 0 22px 0;font-size:15px;color:#5E594B;line-height:1.6">Recibimos una solicitud para cambiar la contraseña de tu cuenta. Este enlace es válido por 1 hora.</p>
       <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:#0E8074">
         <a href="${link}" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:12px">Crear nueva contraseña</a>
@@ -3409,7 +3444,7 @@ function emailVerify(name, link) {
   const text = `Hola ${first},\n\nGracias por crear tu cuenta en Bukeame. Verifica tu email para activar tu cuenta (y tu prueba Pro si te refirieron). Abre este enlace (válido por 24 horas):\n\n${link}\n\nSi no creaste esta cuenta, ignora este correo.\n\n— El equipo de Bukeame`;
   const html = emailShell(`
     <tr><td style="padding:28px 30px 30px 30px">
-      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${first}, verifica tu email</h1>
+      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:800;color:#17150F;line-height:1.3;letter-spacing:-.01em">Hola ${emailEsc(first)}, verifica tu email</h1>
       <p style="margin:0 0 22px 0;font-size:15px;color:#5E594B;line-height:1.6">Confirma tu correo para activar tu cuenta de Bukeame. Si un negocio te refirió, al verificar se activa tu prueba de 15 días del plan Pro.</p>
       <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:#0E8074">
         <a href="${link}" style="display:inline-block;background:#0E8074;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:12px">Verificar mi email</a>
@@ -3576,6 +3611,11 @@ async function expireBilling() {
     `UPDATE subscriptions SET plan_code = 'free', status = 'cancelled', current_period_end = NULL
       WHERE plan_code <> 'free' AND current_period_end IS NOT NULL
         AND now() > current_period_end + interval '7 days'`);
+  // Trials Pro vencidos (referidos) → bajan a 'free'. Sin esto el trial nunca
+  // caducaba (current_period_end queda NULL) y quedaba Pro gratis para siempre.
+  await db.query(
+    `UPDATE subscriptions SET plan_code = 'free', status = 'cancelled'
+      WHERE status = 'trialing' AND trial_ends_at IS NOT NULL AND now() > trial_ends_at`);
 }
 setInterval(() => { expireBilling().catch(e => console.error('expireBilling:', e.message)); }, 3600_000);
 
@@ -3597,9 +3637,17 @@ async function enqueueApptConfirm(businessId, appointmentId) {
   } catch (e) { console.error('enqueueApptConfirm:', e.message); }
 }
 
+// Aplana texto controlado por el cliente (nombre, referencia) antes de meterlo en
+// mensajes de marca Bukéame: quita saltos de línea y control chars para que nadie
+// inyecte líneas falsas / links de phishing dentro de un WhatsApp/email "oficial".
+function oneLine(s) {
+  return String(s == null ? '' : s).replace(/[\u0000-\u001F\u007F]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 // ── Aviso al NEGOCIO: tiene un depósito por validar (in-app + WhatsApp + email) ──
 // El WhatsApp dice que se valida EN LA PLATAFORMA (panel), NUNCA "aquí" por el chat.
 async function alertDepositToValidate(businessId, appointmentId, detail) {
+  detail = oneLine(detail).slice(0, 200);
   const body = `Depósito por validar: ${detail}. Valídalo en tu panel: Agenda → la cita → "Validar depósito y aceptar".`;
   try { await notify(businessId, 'payment', 'Depósito por validar', body, { appointment_id: appointmentId }); } catch (e) {}
   try {
@@ -3616,6 +3664,7 @@ async function alertDepositToValidate(businessId, appointmentId, detail) {
 
 // ── Aviso al NEGOCIO de una nueva cita (in-app + email + WhatsApp al dueño) ──
 async function alertNewAppointment(businessId, appointmentId, detail, pendingDeposit) {
+  detail = oneLine(detail).slice(0, 200);
   const title = pendingDeposit ? 'Nueva cita — pendiente de depósito' : 'Nueva cita';
   try { await notify(businessId, 'new_appointment', title, detail, { appointment_id: appointmentId }); } catch (e) {}
   try {

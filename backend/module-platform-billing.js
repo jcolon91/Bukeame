@@ -247,11 +247,14 @@ function mount(app, ctx) {
       `SELECT category_id FROM business_categories WHERE business_id = $1 ORDER BY category_id LIMIT 1`,
       [business.id]);
     const catId = c.rows[0] ? c.rows[0].category_id : null;
+    // `weeksVal` es el número de BLOQUES de 3 días (así se cobra: $45 × bloques).
+    // Se concede en DÍAS = bloques × 3. Antes concedía SEMANAS completas → daba
+    // ~2.3× de lo pagado (4 bloques = 12 días pagados, pero activaba 28 días).
     const fl = await client.query(
       `INSERT INTO featured_listings (business_id, municipality_id, category_id, ends_at)
-       VALUES ($1, $2, $3, now() + ($4 || ' weeks')::interval)
+       VALUES ($1, $2, $3, now() + ($4 || ' days')::interval)
        RETURNING id, ends_at`,
-      [business.id, business.municipality_id || null, catId, String(weeksVal)]);
+      [business.id, business.municipality_id || null, catId, String(weeksVal * 3)]);
     await client.query(`UPDATE businesses SET is_featured = true WHERE id = $1`, [business.id]);
     return fl.rows[0];
   }

@@ -574,6 +574,17 @@ module.exports.mount = function (app, ctx) {
     const st = found && found.ecommerceStatus;
     if (st === 'CANCEL') { athOrderPending.delete(ecommerceId); return res.json({ status: 'cancelled' }); }
     if (st !== 'CONFIRM' && st !== 'COMPLETED') return res.json({ status: 'pending' });
+
+    // No captures el pago si la orden ya expiró/se canceló (evita cobrar por una
+    // orden que ya no se puede honrar y depender de un reembolso manual).
+    {
+      const o0 = await db.query(`SELECT status, committed FROM product_orders WHERE id = $1`, [pend.orderId]);
+      if (!o0.rows[0] || o0.rows[0].status !== 'pending' || o0.rows[0].committed) {
+        athOrderPending.delete(ecommerceId);
+        return res.json({ status: 'expired', message: 'La orden expiró antes de completarse el pago; no se realizó el cobro.' });
+      }
+    }
+
     let fin = found;
     if (st === 'CONFIRM') {
       fin = await athRest.authorize(pend.authToken);
