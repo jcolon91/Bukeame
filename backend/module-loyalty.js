@@ -164,6 +164,14 @@ module.exports.mount = function (app, ctx) {
        DO UPDATE SET full_name = EXCLUDED.full_name RETURNING id`,
       [biz.id, full_name.trim(), phoneN]);
 
+    // ABUSE: tope de entradas activas en lista de espera por cliente (teléfono).
+    // Sin él, un actor podía apilar cientos de filas basura en la lista y el CRM.
+    const wcap = await db.query(
+      `SELECT count(*)::int n FROM waitlist WHERE business_id = $1 AND client_id = $2 AND status = 'waiting'`,
+      [biz.id, cl.rows[0].id]);
+    if (wcap.rows[0].n >= 5)
+      return bad(res, 'Ya estás varias veces en la lista de espera. Espera a que te avisemos.', 429);
+
     // ¿tiene una cita base que proteger? (held_code)
     let heldId = null;
     if (isStr(held_code, 40)) {

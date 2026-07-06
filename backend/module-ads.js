@@ -20,6 +20,23 @@
 //  campañas 'active'. Las rutas del negocio validan que la campaña sea suya.
 // ============================================================================
 
+// ── Anti-fraude de clics/impresiones ────────────────────────────────────────
+// Deduplica el gasto por (IP · campaña · tipo) en memoria: sin esto, cualquiera
+// podía hacer clics en loop y vaciar el presupuesto prepagado de un competidor
+// (o su propio anuncio). Ventana: 1 min por impresión, 1 h por clic. La memoria
+// se reinicia al reiniciar el proceso (aceptable para throttling de fraude).
+const _adSeen = new Map(); // key -> expiryMs
+function adDup(key, windowMs) {
+  const now = Date.now();
+  const exp = _adSeen.get(key);
+  if (exp && exp > now) return true;               // repetido dentro de la ventana
+  _adSeen.set(key, now + windowMs);
+  if (_adSeen.size > 50000) {                       // poda perezosa para no crecer sin fin
+    for (const [k, v] of _adSeen) if (v <= now) _adSeen.delete(k);
+  }
+  return false;
+}
+
 // ── Helpers de datos (también exportados para server.js / module-platform-billing) ──
 
 // getActivePromoted(db, limit): campañas 'active' con presupuesto disponible,
@@ -228,6 +245,8 @@ function mount(app, ctx) {
   // ──────────────────────────────────────────────────────────────────────────
   app.post('/api/public/ads/:id/impression', pubLimit, asyncH(async (req, res) => {
     if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    // No cobra impresiones repetidas del mismo IP para la misma campaña (1/min).
+    if (adDup('imp|' + req.params.id + '|' + (req.ip || '?'), 60_000)) return res.json({ ok: true });
 
     const client = await db.connect();
     try {
@@ -277,6 +296,9 @@ function mount(app, ctx) {
   // ──────────────────────────────────────────────────────────────────────────
   app.post('/api/public/ads/:id/click', pubLimit, asyncH(async (req, res) => {
     if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+    // Clic repetido del mismo IP para la misma campaña dentro de 1 h → NO cobra
+    // (pero igual devolvemos el slug para redirigir al usuario).
+    const dup = adDup('clk|' + req.params.id + '|' + (req.ip || '?'), 3600_000);
 
     const client = await db.connect();
     try {
@@ -298,8 +320,8 @@ function mount(app, ctx) {
 
       const row = cur.rows[0];
 
-      // Sólo cuenta/gasta si está 'active'; si no, devolvemos el slug sin cobrar.
-      if (row.status === 'active') {
+      // Sólo cuenta/gasta si está 'active' y NO es un clic repetido del mismo IP.
+      if (row.status === 'active' && !dup) {
         await client.query(
           `INSERT INTO ad_events (campaign_id, type) VALUES ($1, 'click')`,
           [req.params.id]);
