@@ -1091,7 +1091,8 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <div class="field"><label>Duración (min) *</label><input id="svcDur" type="number" value="30" min="5" max="480"></div>
       <div class="field"><label>Precio ($) *</label><input id="svcPrice" type="number" value="15" min="0" step="0.01"></div>
     </div>
-    <div class="field"><label>Depósito ($, opcional)</label><input id="svcDep" type="number" value="0" min="0" step="0.01"></div>
+    <div class="field"><label>Depósito ($, opcional)</label><input id="svcDep" type="number" value="0" min="0" step="0.01">
+      <p id="svcDepNote" style="display:none;font-size:12px;color:#c07a1a;margin-top:5px;line-height:1.45">⚠️ Los depósitos requieren plan <b>Pro</b> o superior. En plan gratis el depósito <b>no se cobra</b> al reservar (el cliente reserva sin pagar).</p></div>
     <div class="field"><label>Descripción (opcional)</label><textarea id="svcDesc" rows="2" placeholder="Incluye lavado y peinado"></textarea></div>
     <div class="field" id="svcStaffField" style="display:none">
       <label>¿Quién ofrece este servicio?</label>
@@ -2720,6 +2721,9 @@ function openSvcModal(id){
   document.getElementById('svcModalTitle').textContent = id ? 'Editar servicio' : 'Nuevo servicio';
   document.getElementById('svcSave').textContent = 'Guardar';
   clearAlert('svcAlert');
+  // Aviso: en plan gratis el depósito no se cobra (es función Pro+).
+  var depNote = document.getElementById('svcDepNote');
+  if(depNote) depNote.style.display = (typeof BIZ!=='undefined' && BIZ && (BIZ.plan_code||'free')==='free') ? 'block' : 'none';
   svcModal.classList.add('on');
 }
 function editSvc(id){

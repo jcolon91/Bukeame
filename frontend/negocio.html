@@ -1635,6 +1635,7 @@ function renderPayStep(appt, depCents){
   clearAlert('payAlert');
   var code = (appt && appt.confirmation_code) || '';
   var when = new Date(state.startIso);
+  var sl = document.querySelector('#stepPay .seclabel'); if(sl) sl.textContent = 'Pagar depósito · ' + money(depCents);
   document.getElementById('paySummary').innerHTML =
     '<div class="row"><span>Cita</span><b>'+esc(state.selectedServices.map(function(s){ return s.name; }).join(' + '))+'</b></div>'+
     '<div class="row"><span>Código</span><b>'+esc(code||'—')+'</b></div>'+
