@@ -808,6 +808,15 @@ app.post('/api/businesses', authRequired, asyncH(async (req, res) => {
           await client.query(
             `INSERT INTO business_categories VALUES ($1,$2) ON CONFLICT DO NOTHING`, [biz.id, cid]);
 
+    // Auto-alta del DUEÑO como PRIMER profesional del equipo. Así los servicios se
+    // ofrecen desde el arranque y un negocio de una sola persona (free/pro, 1 staff)
+    // NO tiene que añadirse a mano a "Equipo". Sin user_id (es un profesional del
+    // negocio, no un empleado con login). display_name = nombre del dueño.
+    await client.query(
+      `INSERT INTO staff (business_id, display_name)
+       SELECT $1, COALESCE(NULLIF(TRIM(u.full_name), ''), 'Yo') FROM users u WHERE u.id = $2`,
+      [biz.id, req.user.id]);
+
     await client.query('COMMIT');
     await audit(req, 'business.create', 'business', biz.id, { slug });
     res.status(201).json({ business: biz });
