@@ -701,7 +701,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 
     <section class="view" id="step2">
       <span class="backbtn" id="back2">← Cambiar servicios</span>
-      <div class="seclabel">Elige profesional</div>
+      <div class="seclabel" id="staffLabel">Elige profesional</div>
       <div class="staffrow" id="staffRow"></div>
       <div class="seclabel">Elige el día</div>
       <div class="dates" id="dateRow"></div>
@@ -1468,6 +1468,18 @@ function goStep(n){
 
 function renderStaff(){
   var row = document.getElementById('staffRow');
+  var label = document.getElementById('staffLabel');
+  // Con 0 o 1 profesional no hay nada que elegir → ocultamos el selector y
+  // reservamos con ese único profesional (el dueño). Evita el "Cualquiera" solitario.
+  if(state.staff.length <= 1){
+    if(label) label.style.display = 'none';
+    row.style.display = 'none';
+    row.innerHTML = '';
+    state.staffId = null;   // eligibleStaff usa al único profesional disponible
+    return;
+  }
+  if(label) label.style.display = '';
+  row.style.display = '';
   var html = '<div class="staffchip sel" data-id="">Cualquiera</div>';
   html += state.staff.map(function(s){ return '<div class="staffchip" data-id="'+esc(s.id)+'">'+esc(s.display_name)+'</div>'; }).join('');
   row.innerHTML = html;
@@ -1635,6 +1647,7 @@ function renderPayStep(appt, depCents){
   clearAlert('payAlert');
   var code = (appt && appt.confirmation_code) || '';
   var when = new Date(state.startIso);
+  var sl = document.querySelector('#stepPay .seclabel'); if(sl) sl.textContent = 'Pagar depósito · ' + money(depCents);
   document.getElementById('paySummary').innerHTML =
     '<div class="row"><span>Cita</span><b>'+esc(state.selectedServices.map(function(s){ return s.name; }).join(' + '))+'</b></div>'+
     '<div class="row"><span>Código</span><b>'+esc(code||'—')+'</b></div>'+

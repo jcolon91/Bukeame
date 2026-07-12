@@ -575,13 +575,25 @@ module.exports.mount = function (app, ctx) {
     if (st === 'CANCEL') { athOrderPending.delete(ecommerceId); return res.json({ status: 'cancelled' }); }
     if (st !== 'CONFIRM' && st !== 'COMPLETED') return res.json({ status: 'pending' });
 
-    // No captures el pago si la orden ya expiró/se canceló (evita cobrar por una
-    // orden que ya no se puede honrar y depender de un reembolso manual).
+    // ANTES de capturar: no cobres si la orden ya expiró/se canceló, o si algún
+    // artículo se quedó SIN stock. Evita cobrar por una orden que no se puede honrar
+    // y depender de un reembolso manual. (confirmOrderPayment sigue siendo el guard
+    // atómico FINAL anti-sobreventa para la carrera de milisegundos.)
     {
-      const o0 = await db.query(`SELECT status, committed FROM product_orders WHERE id = $1`, [pend.orderId]);
-      if (!o0.rows[0] || o0.rows[0].status !== 'pending' || o0.rows[0].committed) {
+      const o0 = await db.query(`SELECT status, committed, items FROM product_orders WHERE id = $1`, [pend.orderId]);
+      const ord0 = o0.rows[0];
+      if (!ord0 || ord0.status !== 'pending' || ord0.committed) {
         athOrderPending.delete(ecommerceId);
         return res.json({ status: 'expired', message: 'La orden expiró antes de completarse el pago; no se realizó el cobro.' });
+      }
+      const items0 = Array.isArray(ord0.items) ? ord0.items : [];
+      for (const it of items0) {
+        const p = await db.query(`SELECT stock, name FROM products WHERE id = $1 AND business_id = $2`, [it.product_id, pend.businessId]);
+        const pr = p.rows[0];
+        if (pr && pr.stock != null && pr.stock < (it.qty || 1)) {
+          athOrderPending.delete(ecommerceId);
+          return res.json({ status: 'unavailable', message: `Se agotó "${pr.name || it.name || 'un producto'}" antes de completarse el pago; no se realizó el cobro.` });
+        }
       }
     }
 
