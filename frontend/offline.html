@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sin conexión — Bukéame</title>
+<style>
+:root{--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--text:#ECEAE0;--muted:#8AA197;--green:#36E27B;--green-ink:#08160F;--border:rgba(255,255,255,.1)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Instrument Sans',system-ui,-apple-system,sans-serif;background:radial-gradient(120% 90% at 50% -10%,#12401f 0%,#0c2216 45%,#0a1a12 100%);color:var(--text);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+.wrap{max-width:380px}
+.logo{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800;font-size:32px;letter-spacing:-.02em;margin-bottom:28px}
+.logo i{font-style:normal;color:var(--green)}
+.icon{width:88px;height:88px;border-radius:50%;background:rgba(54,226,123,.10);border:2px solid rgba(54,226,123,.4);display:flex;align-items:center;justify-content:center;margin:0 auto 22px}
+h1{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:800;font-size:24px;letter-spacing:-.01em;margin-bottom:10px}
+p{color:var(--muted);font-size:15px;line-height:1.6;margin-bottom:26px}
+button{background:var(--green);color:var(--green-ink);font-weight:800;font-size:15px;border:0;border-radius:14px;padding:14px 30px;cursor:pointer;font-family:inherit}
+button:active{transform:scale(.98)}
+.status{margin-top:18px;font-family:'Spline Sans Mono',ui-monospace,monospace;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">Buk<i>é</i>ame</div>
+    <div class="icon">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#36E27B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.86a10 10 0 0 1 14 0"/><path d="M8.5 16.9a5 5 0 0 1 7 0"/><line x1="12" y1="20" x2="12.01" y2="20"/><line x1="2" y1="2" x2="22" y2="22"/>
+      </svg>
+    </div>
+    <h1>Sin conexión</h1>
+    <p>No pudimos conectar con Bukéame. Revisa tu internet y vuelve a intentar — tus datos están a salvo.</p>
+    <button type="button" id="retry">Reintentar</button>
+    <div class="status" id="status"></div>
+  </div>
+<script>
+(function(){
+  var btn = document.getElementById('retry'), status = document.getElementById('status');
+  function go(){ status.textContent = 'Reconectando…'; location.replace('index.html'); }
+  btn.addEventListener('click', go);
+  // Si vuelve la conexión, reintenta solo.
+  window.addEventListener('online', go);
+  function ping(){ status.textContent = navigator.onLine ? '' : 'Estás desconectado.'; }
+  window.addEventListener('offline', ping); ping();
+})();
+</script>
+</body>
+</html>
