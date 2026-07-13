@@ -123,6 +123,14 @@
     return run;
   };
 
+  // Helpers sueltos para retrofit manual (mismo look que bkState).
+  W.bkSkeleton = function (spec) { return skelHtml(spec); };
+  W.bkErrorInto = function (el, msg, onRetry) {
+    el = (typeof el === 'string') ? D.getElementById(el) : el; if (!el) return;
+    el.innerHTML = errHtml(msg);
+    var b = el.querySelector('.bk-retry'); if (b && onRetry) b.onclick = onRetry;
+  };
+
   function skelHtml(spec) {
     if (spec && String(spec).indexOf('cards:') === 0) {
       var n = parseInt(String(spec).slice(6), 10) || 3, out = '';
