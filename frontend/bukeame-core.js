@@ -22,7 +22,8 @@
    *      o  window.BUKEAME_SENTRY_DSN = '...';  (antes de este script)
    * Sin ninguna de las dos, bkCaptureError es un no-op (la UI de error igual funciona). */
   var DSN = W.BUKEAME_SENTRY_DSN
-    || ((D.querySelector('meta[name="bukeame-sentry-dsn"]') || {}).content || '').trim();
+    || ((D.querySelector('meta[name="bukeame-sentry-dsn"]') || {}).content || '').trim()
+    || 'https://0689688cbcd54d6da994e7c9a0488474@o4511727735930880.ingest.us.sentry.io/4511727745236992';
 
   W.bkCaptureError = function (err, ctx) {
     try {
@@ -34,21 +35,26 @@
   };
 
   if (DSN && !W.Sentry) {
-    var sc = D.createElement('script');
-    sc.src = 'https://browser.sentry-cdn.com/8.42.0/bundle.min.js';
-    sc.crossOrigin = 'anonymous';
-    sc.onload = function () {
-      try {
-        W.Sentry.init({
-          dsn: DSN,
-          release: W.BUKEAME_RELEASE || 'bukeame-web',
-          environment: (location.hostname === 'bukeame.com') ? 'production' : 'staging',
-          tracesSampleRate: 0,            // por ahora solo errores (sin performance)
-          ignoreErrors: ['ResizeObserver loop', 'Non-Error promise rejection captured']
-        });
-      } catch (e) { /* si falla el init, seguimos sin Sentry */ }
-    };
-    (D.head || D.documentElement).appendChild(sc);
+    var _m = DSN.match(/\/\/([0-9a-f]+)@/i);
+    var _key = _m ? _m[1] : '';
+    if (_key) {
+      // Loader oficial de Sentry (versión-agnóstico; el DSN va embebido por la key).
+      // Instala captura de errores de inmediato y carga el SDK bajo demanda.
+      W.sentryOnLoad = function () {
+        try {
+          W.Sentry.init({
+            release: W.BUKEAME_RELEASE || 'bukeame-web',
+            environment: (location.hostname === 'bukeame.com') ? 'production' : 'staging',
+            tracesSampleRate: 0,           // por ahora solo errores (sin performance)
+            ignoreErrors: ['ResizeObserver loop', 'Non-Error promise rejection captured']
+          });
+        } catch (e) { /* si falla el init, seguimos sin Sentry */ }
+      };
+      var sc = D.createElement('script');
+      sc.src = 'https://js.sentry-cdn.com/' + _key + '.min.js';
+      sc.crossOrigin = 'anonymous';
+      (D.head || D.documentElement).appendChild(sc);
+    }
   }
 
   /* ---------- Boundary global de errores ---------- */
