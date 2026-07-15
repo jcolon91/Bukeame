@@ -1732,9 +1732,15 @@ app.get('/api/public/search', publicLimiter, publicCache, asyncH(async (req, res
 
   if (isStr(q, 80)) {
     vals.push(q.trim());
-    where.push(`(b.name % $${vals.length} OR EXISTS (
-        SELECT 1 FROM services sv WHERE sv.business_id = b.id AND sv.is_active AND sv.name % $${vals.length}))`);
-    rank = `similarity(b.name, $${vals.length})`;
+    const p = `$${vals.length}`;
+    // Busca por NOMBRE del negocio, por SERVICIO, y también por PUEBLO (nombre del
+    // municipio) — antes escribir un pueblo no devolvía nada porque solo miraba
+    // nombre/servicio. Trigrama tolera acentos/typos; ILIKE cubre coincidencia parcial.
+    where.push(`(b.name % ${p}
+        OR EXISTS (SELECT 1 FROM services sv WHERE sv.business_id = b.id AND sv.is_active AND sv.name % ${p})
+        OR EXISTS (SELECT 1 FROM pr_municipalities m WHERE m.id = b.municipality_id
+                     AND (m.name % ${p} OR m.name ILIKE '%'||${p}||'%')))`);
+    rank = `similarity(b.name, ${p})`;
   }
   if (isStr(category, 60))     { vals.push(category);     where.push(`EXISTS (SELECT 1 FROM business_categories bc JOIN categories c ON c.id = bc.category_id WHERE bc.business_id = b.id AND c.slug = $${vals.length})`); }
   if (isStr(municipality, 60)) { vals.push(municipality); where.push(`EXISTS (SELECT 1 FROM pr_municipalities m WHERE m.id = b.municipality_id AND m.slug = $${vals.length})`); }
