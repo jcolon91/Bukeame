@@ -904,11 +904,14 @@ async function api(method, path, body){
 }
 
 async function boot(){
-  if(!SLUG){ document.getElementById('boot').textContent='Enlace inválido. Falta el nombre del negocio.'; return; }
+  const bootEl = document.getElementById('boot');
+  if(!SLUG){ bootEl.textContent='Enlace inválido. Falta el nombre del negocio.'; return; }
+  bootEl.style.display='';
+  bootEl.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : 'Cargando…');
   try{
     const r = await fetch(API+'/public/'+encodeURIComponent(SLUG));
-    if(r.status===404){ document.getElementById('boot').textContent='Negocio no encontrado.'; return; }
-    if(!r.ok){ document.getElementById('boot').textContent='No se pudo cargar. Intenta de nuevo.'; return; }
+    if(r.status===404){ bootEl.textContent='Negocio no encontrado.'; return; }
+    if(!r.ok) throw new Error('http '+r.status);
     const data = await r.json();
     state.biz = data.business;
     state.services = data.services||[];
@@ -926,7 +929,9 @@ async function boot(){
     document.getElementById('boot').style.display='none';
     document.getElementById('page').style.display='block';
   }catch(e){
-    document.getElementById('boot').textContent='Error de conexión.';
+    if(window.bkErrorInto){ window.bkErrorInto(bootEl, 'No se pudo cargar el negocio. Revisa tu conexión.', boot); }
+    else { bootEl.textContent='Error de conexión.'; }
+    if(window.bkCaptureError) window.bkCaptureError(e, {where:'negocio.boot', slug:SLUG});
   }
 }
 
@@ -1527,6 +1532,7 @@ async function loadSlots(){
     var url = API+'/public/'+encodeURIComponent(SLUG)+'/availability?service_id='+encodeURIComponent(ids)+'&date='+state.date;
     if(state.staffId) url += '&staff_id='+encodeURIComponent(state.staffId);
     var r = await fetch(url);
+    if(!r.ok) throw new Error('http '+r.status);
     var data = await r.json();
     var slots = data.slots||[];
     if(slots.length===0){
@@ -1541,7 +1547,9 @@ async function loadSlots(){
       sl.onclick = function(){ state.slot = sl.dataset.iso; goToConfirm(); };
     });
   }catch(e){
-    area.innerHTML = '<div class="slots-empty">No se pudieron cargar las horas. Intenta de nuevo.</div>';
+    if(window.bkErrorInto){ window.bkErrorInto(area, 'No se pudieron cargar las horas.', loadSlots); }
+    else { area.innerHTML = '<div class="slots-empty">No se pudieron cargar las horas. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(e, {where:'negocio.loadSlots', slug:SLUG});
   }
 }
 
