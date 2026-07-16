@@ -100,7 +100,13 @@ async function load(){
     content.innerHTML='<div class="locked"><div class="ic">⏳</div><h2>Lista de espera</h2><p>Cuando se llena tu agenda, los clientes pueden anotarse en lista de espera y les avisas si se abre un espacio. Disponible en el plan Studio.</p><a href="panel.html">Ver planes</a></div>';
     return;
   }
-  const list=(r.ok&&r.data.waitlist)?r.data.waitlist:(r.ok&&Array.isArray(r.data)?r.data:[]);
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(content, 'No se pudo cargar la lista de espera.', load); }
+    else { content.innerHTML='<div class="empty">No se pudo cargar. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('waitlist http '+r.status), {where:'espera.load'});
+    return;
+  }
+  const list=(r.data.waitlist)?r.data.waitlist:(Array.isArray(r.data)?r.data:[]);
   content.innerHTML='<div class="info">💡 Cuando se abra un espacio, podrás ofrecerlo a quien esté en la lista. Recibirán un aviso por WhatsApp.</div>';
   if(list.length===0){
     content.innerHTML+='<div class="empty">No hay nadie en lista de espera.<br>Cuando tu agenda se llene, los clientes podrán anotarse.</div>';
