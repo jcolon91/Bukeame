@@ -490,7 +490,7 @@ function initSlideshow(){
 async function search(){
   const q = document.getElementById('q').value.trim();
   const results = document.getElementById('results');
-  results.innerHTML = '<div class="loading">Buscando…</div>';
+  results.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:4') : '<div class="loading">Buscando…</div>');
   try{
     let url = API+'/public/search?';
     const params = [];
@@ -499,6 +499,7 @@ async function search(){
     if(Number.isFinite(userLat) && Number.isFinite(userLng)){ params.push('lat='+userLat); params.push('lng='+userLng); }
     url += params.join('&');
     const r = await fetch(url);
+    if(!r.ok) throw new Error('http '+r.status);
     const data = await r.json();
     const list = data.businesses || data.results || [];
     const promoted = Array.isArray(data.promoted) ? data.promoted.filter(b=>b && b.slug && b.campaign_id) : [];
@@ -517,7 +518,9 @@ async function search(){
         : '');
     wireAds(results);
   }catch(e){
-    results.innerHTML = '<div class="empty">No se pudo cargar. Intenta de nuevo.</div>';
+    if(window.bkErrorInto){ window.bkErrorInto(results, 'No se pudo cargar la búsqueda.', search); }
+    else { results.innerHTML = '<div class="empty">No se pudo cargar. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(e, {where:'buscar.search'});
   }
 }
 
@@ -533,10 +536,13 @@ async function loadDiscover(){
     if(Number.isFinite(userLat) && Number.isFinite(userLng)){ params.push('lat='+userLat); params.push('lng='+userLng); }
     const url = API+'/public/discover'+(params.length?('?'+params.join('&')):'');
     const r = await fetch(url);
+    if(!r.ok) throw new Error('http '+r.status);
     const data = await r.json();
     renderPortada(data);
   }catch(e){
-    P.innerHTML = '<div class="empty">No se pudo cargar el descubrimiento.<br>Usa el buscador para encontrar negocios.</div>';
+    if(window.bkErrorInto){ window.bkErrorInto(P, 'No se pudo cargar el descubrimiento.', loadDiscover); }
+    else { P.innerHTML = '<div class="empty">No se pudo cargar el descubrimiento.<br>Usa el buscador para encontrar negocios.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(e, {where:'buscar.discover'});
   }
 }
 
