@@ -1905,7 +1905,9 @@ async function boot(){
   try {
     r = await api('GET','/businesses/me');
   } catch(e){
-    document.getElementById('boot').textContent = 'No se pudo conectar. Recarga la página.';
+    if(window.bkErrorInto){ window.bkErrorInto('boot', 'No se pudo conectar. Revisa tu internet.', boot); }
+    else { document.getElementById('boot').textContent = 'No se pudo conectar. Recarga la página.'; }
+    if(window.bkCaptureError) window.bkCaptureError(e, {where:'panel.boot'});
     return;
   }
   // Sin negocio todavía → mostrar onboarding (crear negocio)
@@ -1917,7 +1919,8 @@ async function boot(){
     return;
   }
   if(!r.ok || !r.data || !r.data.business){
-    document.getElementById('boot').textContent = 'No se pudo cargar. Recarga la página.';
+    if(window.bkErrorInto){ window.bkErrorInto('boot', 'No se pudo cargar el panel.', boot); }
+    else { document.getElementById('boot').textContent = 'No se pudo cargar. Recarga la página.'; }
     return;
   }
   // Tiene negocio → mostrar el panel
@@ -2321,6 +2324,8 @@ async function loadDashboard(){
       '<div class="kpi"><small>Ingresos hoy</small><b>'+money(d.ingresos_cents)+'</b></div>'+
       '<div class="kpi"><small>WhatsApp enviados</small><b>'+(d.whatsapp_enviados||0)+'</b></div>'+
       '<div class="kpi"><small>No-shows</small><b>'+(d.no_shows||0)+'</b></div>';
+  } else if(window.bkCaptureError){
+    window.bkCaptureError(new Error('dashboard http '+dash.status), {where:'panel.loadDashboard'});
   }
   await renderAgenda();
 }
@@ -2358,8 +2363,16 @@ async function renderAgenda(){
   setAgPeriodLabel();
   const list = document.getElementById('agendaList');
   const r = agendaRange();
+  list.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : '<div class="empty">Cargando agenda…</div>');
   const resp = await api('GET','/appointments?from='+r.from+'&to='+r.to);
-  const items = (resp.ok && resp.data.appointments) ? resp.data.appointments : [];
+  // Distinguir ERROR de VACÍO: si la API falla NO mostramos el día como si no tuvieras citas.
+  if(!resp.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(list, 'No se pudo cargar la agenda.', renderAgenda); }
+    else { list.innerHTML = '<div class="empty">No se pudo cargar la agenda. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('agenda http '+resp.status), {where:'panel.renderAgenda'});
+    return;
+  }
+  const items = resp.data.appointments || [];
   if(AG_VIEW==='day') renderDayList(list, items);
   else if(AG_VIEW==='week') renderWeek(list, items, r);
   else renderMonth(list, items, r);
@@ -2721,9 +2734,16 @@ function agNav(dir){
 })();
 
 async function loadServices(){
-  const r = await api('GET','/services');
   const list = document.getElementById('svcList');
-  const svcs = (r.ok && r.data.services) ? r.data.services : [];
+  list.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : '<div class="empty">Cargando…</div>');
+  const r = await api('GET','/services');
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(list, 'No se pudieron cargar los servicios.', loadServices); }
+    else { list.innerHTML = '<div class="empty">No se pudieron cargar los servicios. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('services http '+r.status), {where:'panel.loadServices'});
+    return;
+  }
+  const svcs = r.data.services || [];
   if(svcs.length === 0){
     list.innerHTML = '<div class="empty">Aún no tienes servicios.<br>Toca "+ Nuevo" para añadir el primero.</div>';
     return;
@@ -3081,9 +3101,15 @@ function fmtDT(iso){ try{ return new Date(iso).toLocaleString('es-PR',{ timeZone
 
 async function loadClients(q){
   const list = document.getElementById('clientsList');
-  list.innerHTML = '<div class="empty">Cargando…</div>';
+  list.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : '<div class="empty">Cargando…</div>');
   const r = await api('GET','/clients'+(q?('?q='+encodeURIComponent(q)):''));
-  const cls = (r.ok && r.data.clients) ? r.data.clients : [];
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(list, 'No se pudieron cargar los clientes.', function(){ loadClients(q); }); }
+    else { list.innerHTML = '<div class="empty">No se pudieron cargar los clientes. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('clients http '+r.status), {where:'panel.loadClients'});
+    return;
+  }
+  const cls = r.data.clients || [];
   if(!cls.length){ list.innerHTML = '<div class="empty">'+(q?'Sin resultados para esa búsqueda.':'Aún no tienes clientes. Aparecen cuando reservan o los registras en una cita.')+'</div>'; return; }
   list.innerHTML = cls.map(function(c){
     const tags = (c.is_blocked?'<span class="pill pill-red">Bloqueado</span>':'') + (c.no_show_count>0?('<span class="pill">'+c.no_show_count+' no-show</span>'):'');
@@ -3895,9 +3921,14 @@ const ORDER_ST_LABELS = { pending:'Recibida', paid:'Recibida', preparing:'Prepar
 async function loadOrders(){
   clearAlert('ordersAlert');
   const list = document.getElementById('ordersList');
-  list.innerHTML = '<div class="empty">Cargando…</div>';
+  list.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : '<div class="empty">Cargando…</div>');
   const r = await api('GET','/orders');
-  if(!r.ok){ list.innerHTML = ''; showAlert('ordersAlert', (r.data && r.data.error) || 'No se pudieron cargar las órdenes', false); return; }
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(list, (r.data && r.data.error) || 'No se pudieron cargar las órdenes.', loadOrders); }
+    else { list.innerHTML = ''; showAlert('ordersAlert', (r.data && r.data.error) || 'No se pudieron cargar las órdenes', false); }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('orders http '+r.status), {where:'panel.loadOrders'});
+    return;
+  }
   const orders = (r.data && r.data.orders) ? r.data.orders : [];
   if(!orders.length){ list.innerHTML = '<div class="empty">Aún no tienes órdenes. Aparecen cuando un cliente compra en tu tienda.</div>'; return; }
   list.innerHTML = orders.map(function(o){
