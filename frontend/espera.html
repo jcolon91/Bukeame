@@ -97,7 +97,7 @@ async function load(){
   const content=document.getElementById('content');
   // si el plan no incluye lista de espera, da 403
   if(r.status===403){
-    content.innerHTML='<div class="locked"><div class="ic">⏳</div><h2>Lista de espera</h2><p>Cuando se llena tu agenda, los clientes pueden anotarse en lista de espera y les avisas si se abre un espacio. Disponible en el plan Studio.</p><a href="panel.html">Ver planes</a></div>';
+    content.innerHTML='<div class="locked"><div class="ic">⏳</div><h2>Lista de espera</h2><p>Cuando se llena tu agenda, los clientes pueden anotarse en lista de espera y les avisas si se abre un espacio. Disponible en el plan Studio.</p><a href="panel.html" class="ios-hide-purchase">Ver planes</a></div>';
     return;
   }
   if(!r.ok){
