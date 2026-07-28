@@ -81,6 +81,7 @@ window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.d
   document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
 document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
 </script>
+<script src="bukeame-core.js"></script>
 </head>
 <body>
 <div id="boot" class="bootload">Cargando…</div>

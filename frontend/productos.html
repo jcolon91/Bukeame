@@ -132,6 +132,7 @@ html[data-theme="dark"] .stockpill.out{background:rgba(225,90,72,.16);color:#FF8
 .alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
 .foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
 </style>
+<script src="bukeame-core.js"></script>
 </head>
 <body>
 <script>
@@ -218,8 +219,15 @@ async function load(){
   document.getElementById('boot').style.display='none';
   document.getElementById('app').style.display='block';
   const content=document.getElementById('content');
+  // Error de red/servidor: NO mostrar "aún no tienes productos" (falso vacío) → error real con Reintentar
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(content, 'No se pudieron cargar los productos.', load); }
+    else { content.innerHTML='<div class="empty">No se pudieron cargar los productos. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('products http '+r.status), {where:'productos.load'});
+    return;
+  }
   // si el plan no tiene tienda, limit será 0
-  if(r.ok && r.data.limit===0){
+  if(r.data.limit===0){
     document.getElementById('addBtn').style.display='none';
     document.getElementById('storeBtn').style.display='none';
     content.innerHTML='<div class="locked"><div class="ic">🛍️</div><h2>Activa tu tienda</h2><p>Vende productos directo a tus clientes. Disponible con el add-on de Tienda.</p><a href="panel.html#cuenta">Ver planes</a></div>';

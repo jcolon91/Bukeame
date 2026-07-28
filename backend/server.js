@@ -272,6 +272,18 @@ const authLimiter   = rateLimit({ windowMs: 15 * 60_000, max: 20,  message: { er
 const loginLimiter  = rateLimit({ windowMs: 15 * 60_000, max: 8, keyGenerator: (req) => req.ip + '|' + ((req.body && req.body.email) ? String(req.body.email).toLowerCase().trim() : ''), message: { error: 'Demasiados intentos para esta cuenta. Espera 15 minutos.' } });
 // Refresh con su propio cubo, separado de login, para que rotar no consuma intentos de login.
 const refreshLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60, message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
+// Verificación del código 2FA: cubo duro POR CUENTA (keyed por el sub del mfa_token, no por
+// IP) para que una botnet con IPs rotativas no pueda brute-forcear los 6 dígitos en horizontal.
+// authLimiter (20/IP) ya cubre la dimensión por IP; este cierra la dimensión por cuenta.
+const mfaLimiter = rateLimit({
+  windowMs: 15 * 60_000, max: 12,
+  keyGenerator: (req) => {
+    try { const d = jwt.decode((req.body && req.body.mfa_token) || ''); if (d && d.sub) return 'acct|' + d.sub; } catch (e) {}
+    return 'ip|' + req.ip;
+  },
+  skipSuccessfulRequests: true,   // solo cuentan los intentos FALLIDOS (un código correcto no gasta el cubo)
+  message: { error: 'Demasiados intentos de código. Espera 15 minutos.' },
+});
 const publicLimiter = rateLimit({ windowMs: 60_000,      max: 60,  message: { error: 'Vas muy rápido. Intenta en un minuto.' } });
 // Endpoints de ticket por código (ver/cancelar/ref ATH): límite duro para que
 // nadie pueda enumerar/brute-forcear códigos de confirmación de otros clientes.
@@ -379,6 +391,93 @@ async function issueRefresh(userId, req) {
   return token;
 }
 
+// ----------------------------------------------------------------------------
+// 2FA · TOTP (RFC 6238) — SOLO para cuentas admin. Crypto puro, sin dependencias npm.
+// ----------------------------------------------------------------------------
+const MFA_TTL = '5m';   // vida del token intermedio entre "password OK" y "código 2FA"
+
+// Base32 (RFC 4648) sin padding para el secreto (compatible con Google Authenticator/Authy).
+const B32_ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function b32encode(buf) {
+  let bits = 0, val = 0, out = '';
+  for (let i = 0; i < buf.length; i++) {
+    val = (val << 8) | buf[i]; bits += 8;
+    while (bits >= 5) { out += B32_ALPHA[(val >>> (bits - 5)) & 31]; bits -= 5; }
+  }
+  if (bits > 0) out += B32_ALPHA[(val << (5 - bits)) & 31];
+  return out;
+}
+function b32decode(str) {
+  const clean = String(str).toUpperCase().replace(/[^A-Z2-7]/g, '');
+  let bits = 0, val = 0; const out = [];
+  for (let i = 0; i < clean.length; i++) {
+    const idx = B32_ALPHA.indexOf(clean[i]); if (idx < 0) continue;
+    val = (val << 5) | idx; bits += 5;
+    if (bits >= 8) { out.push((val >>> (bits - 8)) & 0xff); bits -= 8; }
+  }
+  return Buffer.from(out);
+}
+
+// Clave de cifrado del secreto TOTP: derivada del JWT_SECRET (no exige nueva env var).
+const TOTP_ENC_KEY = crypto.createHash('sha256').update('bk-totp-enc|' + JWT_SECRET).digest(); // 32 bytes
+function totpEnc(plain) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', TOTP_ENC_KEY, iv);
+  const ct = Buffer.concat([c.update(String(plain), 'utf8'), c.final()]);
+  const tag = c.getAuthTag();
+  return Buffer.concat([iv, tag, ct]).toString('base64');
+}
+function totpDec(enc) {
+  const raw = Buffer.from(String(enc), 'base64');
+  const iv = raw.subarray(0, 12), tag = raw.subarray(12, 28), ct = raw.subarray(28);
+  const d = crypto.createDecipheriv('aes-256-gcm', TOTP_ENC_KEY, iv);
+  d.setAuthTag(tag);
+  return Buffer.concat([d.update(ct), d.final()]).toString('utf8');
+}
+
+function totpGenSecret() { return b32encode(crypto.randomBytes(20)); }  // 160 bits en base32
+
+// Código TOTP de 6 dígitos para un contador dado (RFC 4226/6238, HMAC-SHA1).
+function totpCodeFor(secretB32, counter) {
+  const key = b32decode(secretB32);
+  const buf = Buffer.alloc(8);
+  buf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+  buf.writeUInt32BE(counter >>> 0, 4);
+  const hmac = crypto.createHmac('sha1', key).update(buf).digest();
+  const off = hmac[hmac.length - 1] & 0x0f;
+  const bin = ((hmac[off] & 0x7f) << 24) | (hmac[off + 1] << 16) | (hmac[off + 2] << 8) | (hmac[off + 3]);
+  return String(bin % 1000000).padStart(6, '0');
+}
+// Verifica el código con ventana ±1 paso (30s) para tolerar desfases de reloj. Tiempo constante.
+function totpVerify(secretB32, code) {
+  const c = String(code || '').replace(/\D/g, '');
+  if (!/^\d{6}$/.test(c) || !secretB32) return false;
+  const step = Math.floor(Date.now() / 30000);
+  let ok = false;
+  for (let w = -1; w <= 1; w++) {
+    const cand = totpCodeFor(secretB32, step + w);
+    if (crypto.timingSafeEqual(Buffer.from(cand), Buffer.from(c))) ok = true;
+  }
+  return ok;
+}
+function totpOtpauthURL(secretB32, label) {
+  const iss = 'Bukeame';
+  const acct = encodeURIComponent(label || 'admin');
+  return 'otpauth://totp/' + iss + ':' + acct + '?secret=' + secretB32 + '&issuer=' + iss + '&algorithm=SHA1&digits=6&period=30';
+}
+// Códigos de respaldo: {plain:[...], hashes:[...]} (hash = sha256 hex del código normalizado).
+function totpHashBackup(code) { return sha256(String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '')); }
+function totpGenBackupCodes(n = 8) {
+  const plain = [], hashes = [];
+  for (let i = 0; i < n; i++) {
+    const raw = b32encode(crypto.randomBytes(7)).slice(0, 10);  // 10 chars base32 legibles
+    const code = raw.slice(0, 5) + '-' + raw.slice(5, 10);      // XXXXX-XXXXX
+    plain.push(code);
+    hashes.push(totpHashBackup(code));
+  }
+  return { plain, hashes };
+}
+
 // Genera y envía un email de verificación (invalida los enlaces previos sin usar).
 async function sendVerificationEmail(user) {
   const token = crypto.randomBytes(32).toString('base64url');
@@ -399,6 +498,9 @@ const authRequired = asyncH(async (req, res, next) => {
   let payload;
   try { payload = jwt.verify(h.slice(7), JWT_SECRET); }
   catch { return bad(res, 'Sesión expirada', 401); }
+  // El token intermedio de 2FA (mfa:'pending') NO es una sesión: solo sirve para
+  // /api/auth/login/totp. Bloquear su uso como Bearer evita saltarse el segundo factor.
+  if (payload && payload.mfa === 'pending') return bad(res, 'Verificación de 2FA pendiente', 401);
   const { rows } = await db.query(
     `SELECT id, email, phone, full_name, is_platform_admin,
             email_verified_at IS NOT NULL AS email_verified,
@@ -473,16 +575,66 @@ app.post('/api/auth/login', authLimiter, loginLimiter, asyncH(async (req, res) =
   const { email, password } = req.body || {};
   if (!isEmail(email) || !isStr(password, 100)) return bad(res, 'Credenciales inválidas', 401);
   const { rows } = await db.query(
-    `SELECT id, full_name, email, password_hash, is_platform_admin,
+    `SELECT id, full_name, email, password_hash, is_platform_admin, totp_enabled,
             email_verified_at IS NOT NULL AS email_verified
        FROM users WHERE email = $1 AND deleted_at IS NULL`, [email.toLowerCase()]);
   const u = rows[0];
   if (!u || !u.password_hash || !(await bcrypt.compare(password, u.password_hash)))
     return bad(res, 'Credenciales inválidas', 401);
+  delete u.password_hash;
+  // 2FA: si la cuenta tiene TOTP activo, NO emitimos sesión todavía; pedimos el código.
+  // Token intermedio de 5 min que SOLO sirve para /api/auth/login/totp (no da acceso a nada).
+  if (u.totp_enabled) {
+    const mfaToken = jwt.sign({ sub: u.id, mfa: 'pending' }, JWT_SECRET, { expiresIn: MFA_TTL });
+    return res.json({ mfa_required: true, mfa_token: mfaToken });
+  }
+  delete u.totp_enabled;
   await db.query(`UPDATE users SET last_login_at = now() WHERE id = $1`, [u.id]);
   const refresh = await issueRefresh(u.id, req);
-  delete u.password_hash;
   res.json({ user: u, access_token: signAccess(u), refresh_token: refresh });
+}));
+
+// Segundo paso del login cuando hay 2FA: valida el código TOTP (o un código de
+// respaldo) contra el mfa_token intermedio y recién ahí emite la sesión real.
+app.post('/api/auth/login/totp', authLimiter, mfaLimiter, asyncH(async (req, res) => {
+  const { mfa_token, code } = req.body || {};
+  if (!isStr(mfa_token, 800)) return bad(res, 'Verificación inválida. Inicia sesión de nuevo.', 401);
+  let payload;
+  try { payload = jwt.verify(mfa_token, JWT_SECRET); }
+  catch { return bad(res, 'La verificación expiró. Inicia sesión de nuevo.', 401); }
+  if (!payload || payload.mfa !== 'pending' || !payload.sub)
+    return bad(res, 'Verificación inválida. Inicia sesión de nuevo.', 401);
+  const { rows } = await db.query(
+    `SELECT id, full_name, email, is_platform_admin, totp_secret, totp_enabled, totp_backup_codes,
+            email_verified_at IS NOT NULL AS email_verified
+       FROM users WHERE id = $1 AND deleted_at IS NULL`, [payload.sub]);
+  const u = rows[0];
+  if (!u || !u.totp_enabled || !u.totp_secret) return bad(res, 'Verificación inválida', 401);
+  const raw = String(code || '').trim();
+  let ok = false, usedBackup = false;
+  // 1) Código TOTP de 6 dígitos.
+  if (/^\d{6}$/.test(raw.replace(/\s/g, ''))) {
+    try { ok = totpVerify(totpDec(u.totp_secret), raw); } catch { ok = false; }
+  }
+  // 2) Código de respaldo (un solo uso). Consumo ATÓMICO: el WHERE @> exige que el código
+  //    exista y el operador jsonb '-' lo elimina en el MISMO UPDATE. Si dos peticiones
+  //    compiten con el mismo código, solo una obtiene rowCount=1 → no se puede reusar.
+  if (!ok && raw) {
+    const h = totpHashBackup(raw);
+    const del = await db.query(
+      `UPDATE users SET totp_backup_codes = totp_backup_codes - $1
+        WHERE id = $2 AND totp_backup_codes @> $3::jsonb`,
+      [h, u.id, JSON.stringify([h])]);
+    if (del.rowCount === 1) { ok = true; usedBackup = true; }
+  }
+  if (!ok) return bad(res, 'Código incorrecto. Intenta de nuevo.', 401);
+  await db.query(`UPDATE users SET last_login_at = now() WHERE id = $1`, [u.id]);
+  const refresh = await issueRefresh(u.id, req);
+  const safe = {
+    id: u.id, full_name: u.full_name, email: u.email,
+    is_platform_admin: u.is_platform_admin, email_verified: u.email_verified,
+  };
+  res.json({ user: safe, access_token: signAccess(u), refresh_token: refresh, used_backup: usedBackup });
 }));
 
 // Pedir restablecer contraseña: siempre responde igual (no revela qué emails existen)
@@ -617,7 +769,7 @@ async function socialLoginUpsert(req, res, { provider, sub, email, name }) {
   const emailLc = email.toLowerCase();
   // Busca por *_sub o por email (para enlazar una cuenta existente al proveedor social).
   const found = await db.query(
-    `SELECT id, full_name, email, is_platform_admin,
+    `SELECT id, full_name, email, is_platform_admin, totp_enabled,
             (${subCol} = $1) AS sub_match,
             email_verified_at IS NOT NULL AS is_verified,
             password_hash IS NOT NULL AS has_password
@@ -626,6 +778,14 @@ async function socialLoginUpsert(req, res, { provider, sub, email, name }) {
       ORDER BY (${subCol} = $1) DESC LIMIT 1`, [sub, emailLc]);
   let user;
   if (found.rows[0]) {
+    // 2FA: si la cuenta existente tiene TOTP activo, NO enlazamos NADA ni emitimos sesión
+    // aún — exigimos el segundo factor primero. Cortar ANTES del UPDATE evita que alguien
+    // que controle una identidad social del mismo email enlace su sub o marque el email
+    // verificado sin pasar el 2FA. El login se completa por /api/auth/login/totp.
+    if (found.rows[0].totp_enabled) {
+      const mfaToken = jwt.sign({ sub: found.rows[0].id, mfa: 'pending' }, JWT_SECRET, { expiresIn: MFA_TTL });
+      return res.json({ mfa_required: true, mfa_token: mfaToken });
+    }
     // Es SEGURO enlazar el login social a una cuenta local existente (incluso si esa
     // cuenta no estaba verificada): al llegar aquí el PROVEEDOR ya probó que el usuario
     // controla este email (/auth/google exige email_verified; los emails de Apple son
@@ -1732,9 +1892,15 @@ app.get('/api/public/search', publicLimiter, publicCache, asyncH(async (req, res
 
   if (isStr(q, 80)) {
     vals.push(q.trim());
-    where.push(`(b.name % $${vals.length} OR EXISTS (
-        SELECT 1 FROM services sv WHERE sv.business_id = b.id AND sv.is_active AND sv.name % $${vals.length}))`);
-    rank = `similarity(b.name, $${vals.length})`;
+    const p = `$${vals.length}`;
+    // Busca por NOMBRE del negocio, por SERVICIO, y también por PUEBLO (nombre del
+    // municipio) — antes escribir un pueblo no devolvía nada porque solo miraba
+    // nombre/servicio. Trigrama tolera acentos/typos; ILIKE cubre coincidencia parcial.
+    where.push(`(b.name % ${p}
+        OR EXISTS (SELECT 1 FROM services sv WHERE sv.business_id = b.id AND sv.is_active AND sv.name % ${p})
+        OR EXISTS (SELECT 1 FROM pr_municipalities m WHERE m.id = b.municipality_id
+                     AND (m.name % ${p} OR m.name ILIKE '%'||${p}||'%')))`);
+    rank = `similarity(b.name, ${p})`;
   }
   if (isStr(category, 60))     { vals.push(category);     where.push(`EXISTS (SELECT 1 FROM business_categories bc JOIN categories c ON c.id = bc.category_id WHERE bc.business_id = b.id AND c.slug = $${vals.length})`); }
   if (isStr(municipality, 60)) { vals.push(municipality); where.push(`EXISTS (SELECT 1 FROM pr_municipalities m WHERE m.id = b.municipality_id AND m.slug = $${vals.length})`); }
@@ -3814,6 +3980,11 @@ const sharedHelpers = {
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
   sendEmail, emailPlatformReceipt, emailReceipt, emailGiftCard,
+  // 2FA/TOTP (crypto puro) para el panel admin:
+  totp: {
+    genSecret: totpGenSecret, verify: totpVerify, enc: totpEnc, dec: totpDec,
+    otpauthURL: totpOtpauthURL, genBackupCodes: totpGenBackupCodes, hashBackup: totpHashBackup,
+  },
 };
 // Referencia al módulo de ads (se asigna al montarlo más abajo). Los endpoints
 // públicos la usan en tiempo de request; queda null si el módulo falla al cargar.

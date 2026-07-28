@@ -326,6 +326,7 @@ html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;
 .addon-price{font-family:var(--mono);font-weight:700;font-size:12.5px;color:var(--green)}
 .addon-pending{font-size:11px;font-weight:700;color:var(--warn-ink);background:var(--warn-bg);border:1px solid var(--warn-border);padding:2px 8px;border-radius:99px}
 </style>
+<script src="bukeame-core.js"></script>
 </head>
 <body>
 <script>
@@ -513,6 +514,11 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 
       <section class="view" id="view-horario">
         <div class="tophead"><div><h1>Horario</h1><p>Cuándo está abierto tu negocio.</p></div></div>
+        <a href="ajustes.html" class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;text-decoration:none;color:inherit;margin-bottom:14px">
+          <div><div style="font-weight:700;font-size:14.5px">Reglas de reserva</div>
+            <p style="font-size:12.5px;color:var(--ink2);margin-top:2px">Anticipación mínima, <b>hasta cuándo pueden reservar</b> (horizonte) y cancelaciones.</p></div>
+          <span style="color:var(--green);font-weight:800;font-size:22px;line-height:1">→</span>
+        </a>
         <div class="alert" id="hoursAlert"></div>
         <div class="card" id="hoursCard"></div>
         <button class="btn btn-teal" id="saveHoursBtn">Guardar horario</button>
@@ -1005,6 +1011,20 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <div class="row2">
       <div class="field"><label>Fecha *</label><input id="apDate" type="date"></div>
       <div class="field"><label>Hora *</label><input id="apTime" type="time" value="10:00"></div>
+    </div>
+    <div class="field">
+      <label>Repetir <span style="color:var(--ink2);font-weight:400">— cliente fijo</span></label>
+      <div class="row2">
+        <select id="apRepeat">
+          <option value="0">No repetir</option>
+          <option value="7">Cada semana</option>
+          <option value="14">Cada 2 semanas</option>
+          <option value="21">Cada 3 semanas</option>
+          <option value="28">Cada 4 semanas</option>
+        </select>
+        <input id="apRepeatN" type="number" value="4" min="2" max="26" placeholder="veces" style="display:none">
+      </div>
+      <p id="apRepeatHint" style="font-size:12px;color:var(--ink2);margin-top:5px;display:none">Crea varias citas seguidas a la misma hora y día. Las que choquen con otra cita se saltan.</p>
     </div>
     <label style="display:flex;gap:8px;font-size:13px;color:var(--ink2);margin-bottom:14px;cursor:pointer"><input type="checkbox" id="apWalkin"> Es walk-in (llegó sin reservar)</label>
     <div style="display:flex;gap:10px">
@@ -1744,6 +1764,10 @@ document.getElementById('addApptBtn').onclick = async function(){
   if(staffList.length===1) stfSel.value = staffList[0].id;
   // fecha de hoy por defecto
   document.getElementById('apDate').value = new Date().toLocaleDateString('en-CA',{timeZone:'America/Puerto_Rico'});
+  // reset del selector de repetición
+  document.getElementById('apRepeat').value = '0';
+  document.getElementById('apRepeatN').style.display = 'none';
+  document.getElementById('apRepeatHint').style.display = 'none';
   apptModal.classList.add('on');
 };
 document.getElementById('apCancel').onclick = function(){ apptModal.classList.remove('on'); };
@@ -1761,11 +1785,36 @@ document.getElementById('apSave').onclick = async function(){
   if(!serviceId){ showAlert('apptAlert','Elige un servicio.',false); return; }
   if(!staffId){ showAlert('apptAlert','Elige un profesional.',false); return; }
   if(!date||!time){ showAlert('apptAlert','Elige fecha y hora.',false); return; }
-  const startIso = date+'T'+time+':00';
   const btn = document.getElementById('apSave'); btn.disabled=true; btn.textContent='…';
-  const body = { service_id:serviceId, staff_id:staffId, start_iso:startIso, full_name:name, phone:phone };
-  if(walkin) body.source='walk_in';
-  const r = await api('POST','/appointments', body);
+  const mkBody = function(ymd){ var bd={ service_id:serviceId, staff_id:staffId, start_iso: ymd+'T'+time+':00', full_name:name, phone:phone }; if(walkin) bd.source='walk_in'; return bd; };
+  const repeatDays = parseInt(document.getElementById('apRepeat').value,10)||0;
+
+  if(repeatDays>0){
+    // Cliente fijo: crea varias citas en fechas corridas (misma hora/día). Reusa el
+    // endpoint; las que choquen con otra cita (409) se saltan. PR no tiene DST, así
+    // que sumar días en ms mantiene la hora local exacta.
+    const nTimes = Math.max(2, Math.min(26, parseInt(document.getElementById('apRepeatN').value,10)||2));
+    const base = new Date(date+'T00:00:00');
+    let created=0, skipped=0, firstErr='';
+    for(let i=0;i<nTimes;i++){
+      const d = new Date(base.getTime() + i*repeatDays*86400000);
+      const ymd = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      const ri = await api('POST','/appointments', mkBody(ymd));
+      if(ri.ok) created++; else { skipped++; if(!firstErr) firstErr=(ri.data&&ri.data.error)||''; }
+    }
+    btn.disabled=false; btn.textContent='Crear cita';
+    if(created>0){
+      apptModal.classList.remove('on');
+      document.getElementById('apName').value=''; document.getElementById('apPhone').value='';
+      loadDashboard();
+      if(window.bkToast) bkToast('Se crearon '+created+' de '+nTimes+' citas'+(skipped?(' · '+skipped+' se saltaron por choque de horario'):''));
+    }else{
+      showAlert('apptAlert', 'No se creó ninguna cita. '+(firstErr||'Revisa el horario y los choques.'), false);
+    }
+    return;
+  }
+
+  const r = await api('POST','/appointments', mkBody(date));
   btn.disabled=false; btn.textContent='Crear cita';
   if(r.ok){
     apptModal.classList.remove('on');
@@ -1774,6 +1823,11 @@ document.getElementById('apSave').onclick = async function(){
   }else{
     showAlert('apptAlert', r.data.error||'No se pudo crear la cita.', false);
   }
+};
+document.getElementById('apRepeat').onchange = function(){
+  var on = (parseInt(this.value,10)||0) > 0;
+  document.getElementById('apRepeatN').style.display = on ? '' : 'none';
+  document.getElementById('apRepeatHint').style.display = on ? 'block' : 'none';
 };
 
 // ── Notificaciones (campanita) ─────────────────────────────────────────────
@@ -1851,7 +1905,9 @@ async function boot(){
   try {
     r = await api('GET','/businesses/me');
   } catch(e){
-    document.getElementById('boot').textContent = 'No se pudo conectar. Recarga la página.';
+    if(window.bkErrorInto){ window.bkErrorInto('boot', 'No se pudo conectar. Revisa tu internet.', boot); }
+    else { document.getElementById('boot').textContent = 'No se pudo conectar. Recarga la página.'; }
+    if(window.bkCaptureError) window.bkCaptureError(e, {where:'panel.boot'});
     return;
   }
   // Sin negocio todavía → mostrar onboarding (crear negocio)
@@ -1863,7 +1919,8 @@ async function boot(){
     return;
   }
   if(!r.ok || !r.data || !r.data.business){
-    document.getElementById('boot').textContent = 'No se pudo cargar. Recarga la página.';
+    if(window.bkErrorInto){ window.bkErrorInto('boot', 'No se pudo cargar el panel.', boot); }
+    else { document.getElementById('boot').textContent = 'No se pudo cargar. Recarga la página.'; }
     return;
   }
   // Tiene negocio → mostrar el panel
@@ -2267,6 +2324,8 @@ async function loadDashboard(){
       '<div class="kpi"><small>Ingresos hoy</small><b>'+money(d.ingresos_cents)+'</b></div>'+
       '<div class="kpi"><small>WhatsApp enviados</small><b>'+(d.whatsapp_enviados||0)+'</b></div>'+
       '<div class="kpi"><small>No-shows</small><b>'+(d.no_shows||0)+'</b></div>';
+  } else if(window.bkCaptureError){
+    window.bkCaptureError(new Error('dashboard http '+dash.status), {where:'panel.loadDashboard'});
   }
   await renderAgenda();
 }
@@ -2304,8 +2363,16 @@ async function renderAgenda(){
   setAgPeriodLabel();
   const list = document.getElementById('agendaList');
   const r = agendaRange();
+  list.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : '<div class="empty">Cargando agenda…</div>');
   const resp = await api('GET','/appointments?from='+r.from+'&to='+r.to);
-  const items = (resp.ok && resp.data.appointments) ? resp.data.appointments : [];
+  // Distinguir ERROR de VACÍO: si la API falla NO mostramos el día como si no tuvieras citas.
+  if(!resp.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(list, 'No se pudo cargar la agenda.', renderAgenda); }
+    else { list.innerHTML = '<div class="empty">No se pudo cargar la agenda. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('agenda http '+resp.status), {where:'panel.renderAgenda'});
+    return;
+  }
+  const items = resp.data.appointments || [];
   if(AG_VIEW==='day') renderDayList(list, items);
   else if(AG_VIEW==='week') renderWeek(list, items, r);
   else renderMonth(list, items, r);
@@ -2667,9 +2734,16 @@ function agNav(dir){
 })();
 
 async function loadServices(){
-  const r = await api('GET','/services');
   const list = document.getElementById('svcList');
-  const svcs = (r.ok && r.data.services) ? r.data.services : [];
+  list.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : '<div class="empty">Cargando…</div>');
+  const r = await api('GET','/services');
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(list, 'No se pudieron cargar los servicios.', loadServices); }
+    else { list.innerHTML = '<div class="empty">No se pudieron cargar los servicios. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('services http '+r.status), {where:'panel.loadServices'});
+    return;
+  }
+  const svcs = r.data.services || [];
   if(svcs.length === 0){
     list.innerHTML = '<div class="empty">Aún no tienes servicios.<br>Toca "+ Nuevo" para añadir el primero.</div>';
     return;
@@ -3027,9 +3101,15 @@ function fmtDT(iso){ try{ return new Date(iso).toLocaleString('es-PR',{ timeZone
 
 async function loadClients(q){
   const list = document.getElementById('clientsList');
-  list.innerHTML = '<div class="empty">Cargando…</div>';
+  list.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : '<div class="empty">Cargando…</div>');
   const r = await api('GET','/clients'+(q?('?q='+encodeURIComponent(q)):''));
-  const cls = (r.ok && r.data.clients) ? r.data.clients : [];
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(list, 'No se pudieron cargar los clientes.', function(){ loadClients(q); }); }
+    else { list.innerHTML = '<div class="empty">No se pudieron cargar los clientes. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('clients http '+r.status), {where:'panel.loadClients'});
+    return;
+  }
+  const cls = r.data.clients || [];
   if(!cls.length){ list.innerHTML = '<div class="empty">'+(q?'Sin resultados para esa búsqueda.':'Aún no tienes clientes. Aparecen cuando reservan o los registras en una cita.')+'</div>'; return; }
   list.innerHTML = cls.map(function(c){
     const tags = (c.is_blocked?'<span class="pill pill-red">Bloqueado</span>':'') + (c.no_show_count>0?('<span class="pill">'+c.no_show_count+' no-show</span>'):'');
@@ -3841,9 +3921,14 @@ const ORDER_ST_LABELS = { pending:'Recibida', paid:'Recibida', preparing:'Prepar
 async function loadOrders(){
   clearAlert('ordersAlert');
   const list = document.getElementById('ordersList');
-  list.innerHTML = '<div class="empty">Cargando…</div>';
+  list.innerHTML = (window.bkSkeleton ? window.bkSkeleton('cards:3') : '<div class="empty">Cargando…</div>');
   const r = await api('GET','/orders');
-  if(!r.ok){ list.innerHTML = ''; showAlert('ordersAlert', (r.data && r.data.error) || 'No se pudieron cargar las órdenes', false); return; }
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(list, (r.data && r.data.error) || 'No se pudieron cargar las órdenes.', loadOrders); }
+    else { list.innerHTML = ''; showAlert('ordersAlert', (r.data && r.data.error) || 'No se pudieron cargar las órdenes', false); }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('orders http '+r.status), {where:'panel.loadOrders'});
+    return;
+  }
   const orders = (r.data && r.data.orders) ? r.data.orders : [];
   if(!orders.length){ list.innerHTML = '<div class="empty">Aún no tienes órdenes. Aparecen cuando un cliente compra en tu tienda.</div>'; return; }
   list.innerHTML = orders.map(function(o){

@@ -113,6 +113,7 @@ html[data-theme="dark"] .statebadge.pending{background:rgba(239,161,47,.18);colo
 .empty a{display:inline-block;margin-top:16px;background:var(--green);color:var(--green-ink);font-weight:700;font-size:14px;padding:12px 22px;border-radius:13px;box-shadow:0 6px 16px -9px var(--green-glow)}
 .foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
 </style>
+<script src="bukeame-core.js"></script>
 </head>
 <body>
 <script>
@@ -419,24 +420,37 @@ async function doReview(card,code,btn){
 }
 
 async function load(){
-  const r=await api('GET','/me/appointments');
   document.getElementById('boot').style.display='none';
   document.getElementById('app').style.display='block';
-  if(!r.ok){
-    DATA.upcoming=[]; DATA.past=[];
-  }else{
+  var content=document.getElementById('content');
+  content.innerHTML=(window.bkSkeleton?bkSkeleton('cards:3'):'<div class="empty">Cargando…</div>');
+  try{
+    const r=await api('GET','/me/appointments');
+    if(!r.ok) throw new Error((r.data&&r.data.error)||'No se pudieron cargar tus citas');
     DATA.upcoming=Array.isArray(r.data.upcoming)?r.data.upcoming:[];
     DATA.past=Array.isArray(r.data.past)?r.data.past:[];
+    render();
+  }catch(err){
+    if(err&&err.message==='unauth') return;   // 401 → api() ya redirige a acceso
+    if(window.bkCaptureError) bkCaptureError(err,{where:'cliente/load'});
+    if(window.bkErrorInto) bkErrorInto(content,'No pudimos cargar tus citas. Revisa tu conexión.',load);
+    else content.innerHTML='<div class="empty">No se pudo cargar. Intenta de nuevo.</div>';
   }
-  render();
 }
 
 async function loadOrders(){
-  const r=await api('GET','/me/orders');
-  ORDERS_LOADED=true;
-  DATA.orders=(r.ok&&Array.isArray(r.data.orders))?r.data.orders:[];
-  if(TAB==='orders') render(); else {
-    document.getElementById('cntOrders').textContent=DATA.orders.length?('('+DATA.orders.length+')'):'';
+  var content=document.getElementById('content');
+  if(TAB==='orders') content.innerHTML=(window.bkSkeleton?bkSkeleton('cards:3'):'<div class="empty">Cargando tus compras…</div>');
+  try{
+    const r=await api('GET','/me/orders');
+    if(!r.ok) throw new Error((r.data&&r.data.error)||'No se pudieron cargar tus compras');
+    ORDERS_LOADED=true;
+    DATA.orders=Array.isArray(r.data.orders)?r.data.orders:[];
+    if(TAB==='orders') render(); else document.getElementById('cntOrders').textContent=DATA.orders.length?('('+DATA.orders.length+')'):'';
+  }catch(err){
+    if(err&&err.message==='unauth') return;
+    if(window.bkCaptureError) bkCaptureError(err,{where:'cliente/loadOrders'});
+    if(TAB==='orders'&&window.bkErrorInto) bkErrorInto(content,'No pudimos cargar tus compras. Intenta de nuevo.',loadOrders);
   }
 }
 

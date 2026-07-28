@@ -13,7 +13,7 @@
 // ============================================================================
 
 function mount(app, { db, authRequired, h }) {
-  const { asyncH, bad, audit, isUuid, notify } = h;
+  const { asyncH, bad, audit, isUuid, notify, totp } = h;
 
   // ── Middleware: exige que el usuario sea admin de plataforma ──────────────
   const adminRequired = asyncH(async (req, res, next) => {
@@ -621,6 +621,86 @@ function mount(app, { db, authRequired, h }) {
     if (!rows[0]) return bad(res, 'Solicitud no encontrada o ya resuelta', 404);
     await audit(req, 'admin.category_request.reject', 'category_request', req.params.id, {});
     res.json({ ok: true });
+  }));
+
+  // ════════════════════ 2FA · TOTP (segundo factor del admin) ═════════════════
+  // Helper local: valida un código TOTP (6 dígitos) o de respaldo contra el usuario cargado.
+  function verify2fa(u, code) {
+    const raw = String(code || '').trim();
+    if (/^\d{6}$/.test(raw.replace(/\s/g, ''))) {
+      try { if (u.totp_secret && totp.verify(totp.dec(u.totp_secret), raw)) return true; } catch (e) { /* sigue */ }
+    }
+    if (raw) {
+      const hh = totp.hashBackup(raw);
+      const codes = Array.isArray(u.totp_backup_codes) ? u.totp_backup_codes : [];
+      if (codes.includes(hh)) return true;
+    }
+    return false;
+  }
+
+  // Estado del 2FA de la cuenta admin en sesión.
+  app.get('/api/admin/2fa/status', authRequired, adminRequired, asyncH(async (req, res) => {
+    const { rows } = await db.query(
+      `SELECT totp_enabled, COALESCE(jsonb_array_length(totp_backup_codes), 0) AS backup_left
+         FROM users WHERE id = $1`, [req.user.id]);
+    const row = rows[0] || {};
+    res.json({ enabled: !!row.totp_enabled, backup_codes_left: Number(row.backup_left || 0) });
+  }));
+
+  // Paso 1: generar un secreto NUEVO (pendiente) → devuelve otpauth + clave manual.
+  // No activa nada aún (hay que confirmar con /enable). Rechaza si ya está activo.
+  app.post('/api/admin/2fa/setup', authRequired, adminRequired, asyncH(async (req, res) => {
+    const { rows } = await db.query(`SELECT totp_enabled FROM users WHERE id = $1`, [req.user.id]);
+    if (rows[0] && rows[0].totp_enabled) return bad(res, 'Ya tienes 2FA activo. Desactívalo primero para reconfigurarlo.', 409);
+    const secret = totp.genSecret();
+    await db.query(`UPDATE users SET totp_secret = $1, totp_enabled = false WHERE id = $2`, [totp.enc(secret), req.user.id]);
+    res.json({ secret, otpauth: totp.otpauthURL(secret, req.user.email || 'admin') });
+  }));
+
+  // Paso 2: confirmar el código del autenticador → activa el 2FA y entrega los
+  // códigos de respaldo UNA sola vez (en DB se guardan solo sus hashes).
+  app.post('/api/admin/2fa/enable', authRequired, adminRequired, asyncH(async (req, res) => {
+    const code = String((req.body && req.body.code) || '').slice(0, 64);
+    const { rows } = await db.query(`SELECT totp_secret, totp_enabled FROM users WHERE id = $1`, [req.user.id]);
+    const u = rows[0] || {};
+    if (u.totp_enabled) return bad(res, 'El 2FA ya está activo.', 409);
+    if (!u.totp_secret) return bad(res, 'Primero genera el código (paso 1).', 400);
+    let ok = false;
+    try { ok = totp.verify(totp.dec(u.totp_secret), code); } catch (e) { ok = false; }
+    if (!ok) return bad(res, 'Código incorrecto. Revisa la hora de tu teléfono e intenta de nuevo.', 400);
+    const backup = totp.genBackupCodes(8);
+    await db.query(`UPDATE users SET totp_enabled = true, totp_backup_codes = $1 WHERE id = $2`,
+      [JSON.stringify(backup.hashes), req.user.id]);
+    // Al activar 2FA invalidamos las sesiones/refresh previos: si una sesión estaba
+    // comprometida ANTES del 2FA, esto la expulsa (obliga a re-login con el 2do factor).
+    await db.query(`UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [req.user.id]);
+    await audit(req, 'admin.2fa.enable', 'user', req.user.id, {});
+    res.json({ ok: true, backup_codes: backup.plain });
+  }));
+
+  // Regenerar códigos de respaldo (exige un código válido; invalida los anteriores).
+  app.post('/api/admin/2fa/backup-codes', authRequired, adminRequired, asyncH(async (req, res) => {
+    const code = String((req.body && req.body.code) || '').slice(0, 64);
+    const { rows } = await db.query(`SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = $1`, [req.user.id]);
+    const u = rows[0] || {};
+    if (!u.totp_enabled || !u.totp_secret) return bad(res, 'El 2FA no está activo.', 400);
+    if (!verify2fa(u, code)) return bad(res, 'Código incorrecto.', 400);
+    const backup = totp.genBackupCodes(8);
+    await db.query(`UPDATE users SET totp_backup_codes = $1 WHERE id = $2`, [JSON.stringify(backup.hashes), req.user.id]);
+    await audit(req, 'admin.2fa.backup_regen', 'user', req.user.id, {});
+    res.json({ ok: true, backup_codes: backup.plain });
+  }));
+
+  // Desactivar 2FA (exige un código válido: TOTP o de respaldo).
+  app.post('/api/admin/2fa/disable', authRequired, adminRequired, asyncH(async (req, res) => {
+    const code = String((req.body && req.body.code) || '').slice(0, 64);
+    const { rows } = await db.query(`SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = $1`, [req.user.id]);
+    const u = rows[0] || {};
+    if (!u.totp_enabled) return res.json({ ok: true, enabled: false });
+    if (!verify2fa(u, code)) return bad(res, 'Código incorrecto.', 400);
+    await db.query(`UPDATE users SET totp_enabled = false, totp_secret = NULL, totp_backup_codes = NULL WHERE id = $1`, [req.user.id]);
+    await audit(req, 'admin.2fa.disable', 'user', req.user.id, {});
+    res.json({ ok: true, enabled: false });
   }));
 }
 

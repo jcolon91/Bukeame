@@ -94,6 +94,7 @@ html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;
 .sep{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted2);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--border)}
 </style>
+<script src="bukeame-core.js"></script>
 </head>
 <body>
 <script>
@@ -135,10 +136,19 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <!-- LOGIN -->
       <div class="pane on" id="entrar">
         <div class="alert" id="loginAlert"></div>
-        <div class="field"><label>EMAIL</label><input id="loginEmail" type="email" placeholder="tu@negocio.com" autocomplete="email"></div>
-        <div class="field"><label>CONTRASEÑA</label><input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+        <div class="field" id="fEmail"><label>EMAIL</label><input id="loginEmail" type="email" placeholder="tu@negocio.com" autocomplete="email"></div>
+        <div class="field" id="fPass"><label>CONTRASEÑA</label><input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
         <button class="cta" id="loginBtn">Entrar →</button>
-        <div class="foot"><a href="#" id="forgotLink">¿Olvidaste tu contraseña?</a></div>
+        <div class="foot" id="loginFoot"><a href="#" id="forgotLink">¿Olvidaste tu contraseña?</a></div>
+
+        <!-- PASO 2FA (oculto hasta que el login lo pida) -->
+        <div id="mfaBox" style="display:none">
+          <div class="field"><label>CÓDIGO DE VERIFICACIÓN (2FA)</label>
+            <input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" placeholder="Código de 6 dígitos" style="letter-spacing:.18em;font-family:var(--mono)">
+          </div>
+          <button class="cta" id="mfaBtn">Verificar →</button>
+          <div class="foot">Abre tu app autenticadora (Google Authenticator, Authy…). ¿Sin teléfono? Escribe un <b>código de respaldo</b>. · <a href="#" id="mfaCancel">Cancelar</a></div>
+        </div>
       </div>
 
       <!-- REGISTRO -->
@@ -233,6 +243,32 @@ function saveSessionAndGo(data){
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────
 const loginBtn = document.getElementById('loginBtn');
+const mfaBtn = document.getElementById('mfaBtn');
+let mfaToken = null;   // token intermedio (5 min) entre password OK y código 2FA
+
+function showMfaStep(){
+  // Asegura que el panel "Entrar" esté visible (p.ej. si el 2FA vino de un botón social
+  // mientras la pestaña activa era "Crear cuenta").
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on', x.dataset.p==='entrar'));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on', p.id==='entrar'));
+  document.getElementById('fEmail').style.display = 'none';
+  document.getElementById('fPass').style.display = 'none';
+  loginBtn.style.display = 'none';
+  document.getElementById('loginFoot').style.display = 'none';
+  document.getElementById('mfaBox').style.display = 'block';
+  showAlert('loginAlert','Ingresa el código de tu app autenticadora.', true);
+  const c = document.getElementById('mfaCode'); c.value=''; c.focus();
+}
+function hideMfaStep(){
+  mfaToken = null;
+  document.getElementById('mfaBox').style.display = 'none';
+  document.getElementById('fEmail').style.display = '';
+  document.getElementById('fPass').style.display = '';
+  loginBtn.style.display = '';
+  document.getElementById('loginFoot').style.display = '';
+  loginBtn.disabled = false; loginBtn.textContent = 'Entrar →';
+}
+
 loginBtn.onclick = async ()=>{
   const email = document.getElementById('loginEmail').value.trim();
   const pass  = document.getElementById('loginPass').value;
@@ -240,6 +276,7 @@ loginBtn.onclick = async ()=>{
   loginBtn.disabled = true; loginBtn.textContent = 'Entrando…';
   try{
     const data = await apiPost('/auth/login', { email, password: pass });
+    if(data && data.mfa_required){ mfaToken = data.mfa_token; showMfaStep(); return; }
     showAlert('loginAlert','¡Bienvenido! Entrando…', true);
     saveSessionAndGo(data);
   }catch(err){
@@ -247,6 +284,28 @@ loginBtn.onclick = async ()=>{
     loginBtn.disabled = false; loginBtn.textContent = 'Entrar →';
   }
 };
+
+// Paso 2FA: verificar el código (o uno de respaldo) contra el mfa_token.
+mfaBtn.onclick = async ()=>{
+  const code = document.getElementById('mfaCode').value.trim();
+  if(!code){ showAlert('loginAlert','Escribe el código.', false); return; }
+  if(!mfaToken){ hideMfaStep(); showAlert('loginAlert','La verificación expiró. Inicia sesión de nuevo.', false); return; }
+  mfaBtn.disabled = true; mfaBtn.textContent = 'Verificando…';
+  try{
+    const data = await apiPost('/auth/login/totp', { mfa_token: mfaToken, code });
+    showAlert('loginAlert','¡Verificado! Entrando…', true);
+    saveSessionAndGo(data);
+  }catch(err){
+    showAlert('loginAlert', err.message, false);
+    mfaBtn.disabled = false; mfaBtn.textContent = 'Verificar →';
+    const c = document.getElementById('mfaCode'); c.focus(); c.select();
+  }
+};
+document.getElementById('mfaCancel').addEventListener('click', (e)=>{
+  e.preventDefault(); hideMfaStep();
+  const al = document.getElementById('loginAlert'); al.textContent=''; al.className='alert';
+});
+document.getElementById('mfaCode').addEventListener('keydown', e=>{ if(e.key==='Enter') mfaBtn.click(); });
 
 // ── REGISTRO ──────────────────────────────────────────────────────────────
 const regBtn = document.getElementById('regBtn');
@@ -320,6 +379,7 @@ function socialAlert(msg, ok){
 async function socialLogin(provider, idToken){
   try{
     const data = await apiPost('/auth/' + provider, { id_token: idToken });
+    if(data && data.mfa_required){ mfaToken = data.mfa_token; showMfaStep(); return; }
     socialAlert('¡Bienvenido! Entrando…', true);
     saveSessionAndGo(data);
   }catch(err){

@@ -140,6 +140,7 @@ tr:last-child td{border-bottom:0}
 }
 .foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:30px 0}
 </style>
+<script src="bukeame-core.js"></script>
 </head>
 <body>
 <script>
@@ -166,6 +167,14 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
   <div id="error" class="state err" style="display:none"></div>
 
   <div id="dash" style="display:none">
+
+    <!-- SEGURIDAD / 2FA -->
+    <div class="section">
+      <div class="seclabel">Seguridad de tu cuenta</div>
+      <div class="tablecard" id="sec2fa" style="padding:16px">
+        <div id="sec2faBody" class="muted">Cargando…</div>
+      </div>
+    </div>
 
     <!-- MÉTRICAS -->
     <div class="section">
@@ -526,9 +535,130 @@ async function load(){
     render(data);
     loadReferrals();
     loadCategoryRequests();
+    load2fa();
   }catch(err){
     showError('Error de conexión. Verifica tu internet e intenta de nuevo.');
   }
+}
+
+// ════════════════════════ 2FA · TOTP (gestión desde el panel) ════════════════
+function h2fa(json){ const h = { 'Authorization':'Bearer '+token }; if(json) h['Content-Type']='application/json'; return h; }
+
+async function load2fa(){
+  const body = document.getElementById('sec2faBody');
+  try{
+    const r = await fetch(API+'/admin/2fa/status', { headers: h2fa(false) });
+    if(!r.ok){ body.innerHTML = '<span class="muted">No se pudo cargar el estado de 2FA.</span>'; return; }
+    render2fa(await r.json());
+  }catch(e){ body.innerHTML = '<span class="muted">No se pudo cargar el estado de 2FA.</span>'; }
+}
+
+function render2fa(d){
+  const body = document.getElementById('sec2faBody');
+  if(d.enabled){
+    body.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="pill active">2FA activo</span>'+
+      '<span class="muted">Códigos de respaldo sin usar: '+(d.backup_codes_left||0)+'</span></div>'+
+      '<p class="muted" style="margin:10px 0 12px">Cada inicio de sesión te pedirá un código de tu app autenticadora.</p>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="actbtn" id="btn2faRegen">Regenerar códigos de respaldo</button>'+
+        '<button class="actbtn off" id="btn2faDisable">Desactivar 2FA</button></div>';
+    document.getElementById('btn2faRegen').onclick = ()=> ask2faCode('regen');
+    document.getElementById('btn2faDisable').onclick = ()=> ask2faCode('disable');
+  } else {
+    body.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="pill cancelled">2FA inactivo</span>'+
+      '<span class="muted">Protege tu panel con un segundo factor.</span></div>'+
+      '<p class="muted" style="margin:10px 0 12px">Aunque alguien tenga tu contraseña, sin el código de tu teléfono no puede entrar.</p>'+
+      '<button class="actbtn" id="btn2faSetup">Activar 2FA</button>';
+    document.getElementById('btn2faSetup').onclick = start2faSetup;
+  }
+}
+
+async function start2faSetup(){
+  const body = document.getElementById('sec2faBody');
+  body.innerHTML = '<span class="muted">Generando…</span>';
+  try{
+    const r = await fetch(API+'/admin/2fa/setup', { method:'POST', headers: h2fa(true), body:'{}' });
+    const d = await r.json();
+    if(!r.ok){ body.innerHTML = '<span style="color:#C0392B">'+esc(d.error||'No se pudo iniciar el 2FA.')+'</span>'; return; }
+    render2faSetup(d);
+  }catch(e){ body.innerHTML = '<span style="color:#C0392B">Error de conexión.</span>'; }
+}
+
+function render2faSetup(d){
+  const body = document.getElementById('sec2faBody');
+  body.innerHTML =
+    '<ol style="padding-left:18px;line-height:1.7;margin:0 0 12px">'+
+      '<li>Abre <b>Google Authenticator</b> o <b>Authy</b> en tu teléfono.</li>'+
+      '<li>Toca “+” y elige <b>“Ingresar una clave de configuración”</b>.</li>'+
+      '<li>Escribe esta clave (cuenta: tu email):</li></ol>'+
+    '<div style="font-family:var(--mono);font-size:16px;letter-spacing:.12em;background:var(--card-soft);padding:12px;border-radius:10px;word-break:break-all;user-select:all">'+esc(d.secret)+'</div>'+
+    '<div class="muted" style="margin:8px 0 14px;font-size:12px;word-break:break-all">Enlace otpauth: <span style="user-select:all">'+esc(d.otpauth)+'</span></div>'+
+    '<label class="muted" style="display:block;margin-bottom:6px">Escribe el código de 6 dígitos que muestra el app:</label>'+
+    '<input id="sec2faCode" inputmode="numeric" placeholder="000000" maxlength="7" style="font-family:var(--mono);letter-spacing:.2em;padding:10px 12px;border-radius:10px;border:1px solid var(--line,#ccc);width:150px;background:var(--card);color:var(--text)">'+
+    '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'+
+      '<button class="actbtn" id="btn2faEnable">Activar</button>'+
+      '<button class="actbtn off" id="btn2faCancel">Cancelar</button></div>'+
+    '<div id="sec2faMsg" style="margin-top:10px;color:#C0392B;font-size:13px"></div>';
+  document.getElementById('btn2faEnable').onclick = do2faEnable;
+  document.getElementById('btn2faCancel').onclick = load2fa;
+  document.getElementById('sec2faCode').addEventListener('keydown', e=>{ if(e.key==='Enter') do2faEnable(); });
+}
+
+async function do2faEnable(){
+  const code = (document.getElementById('sec2faCode').value||'').trim();
+  const msg = document.getElementById('sec2faMsg');
+  if(!code){ msg.textContent='Escribe el código.'; return; }
+  const btn = document.getElementById('btn2faEnable'); btn.disabled=true; btn.textContent='Activando…';
+  try{
+    const r = await fetch(API+'/admin/2fa/enable', { method:'POST', headers: h2fa(true), body: JSON.stringify({ code }) });
+    const d = await r.json();
+    if(!r.ok){ msg.textContent = d.error||'Código incorrecto.'; btn.disabled=false; btn.textContent='Activar'; return; }
+    showBackupCodes(d.backup_codes, '¡2FA activado! Guarda estos códigos de respaldo. Cada uno sirve UNA vez si pierdes el teléfono.');
+  }catch(e){ msg.textContent='Error de conexión.'; btn.disabled=false; btn.textContent='Activar'; }
+}
+
+function ask2faCode(action){
+  const body = document.getElementById('sec2faBody');
+  const title = action==='disable' ? 'Desactivar 2FA' : 'Regenerar códigos de respaldo';
+  body.innerHTML =
+    '<p style="margin:0 0 8px"><b>'+title+'</b></p>'+
+    '<p class="muted" style="margin:0 0 10px">Confirma con un código de tu app (o uno de respaldo):</p>'+
+    '<input id="sec2faCode" inputmode="numeric" placeholder="000000" maxlength="12" style="font-family:var(--mono);letter-spacing:.16em;padding:10px 12px;border-radius:10px;border:1px solid var(--line,#ccc);width:180px;background:var(--card);color:var(--text)">'+
+    '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'+
+      '<button class="actbtn" id="btn2faConfirm">Confirmar</button>'+
+      '<button class="actbtn off" id="btn2faBack">Volver</button></div>'+
+    '<div id="sec2faMsg" style="margin-top:10px;color:#C0392B;font-size:13px"></div>';
+  document.getElementById('btn2faBack').onclick = load2fa;
+  document.getElementById('sec2faCode').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('btn2faConfirm').click(); });
+  document.getElementById('btn2faConfirm').onclick = async function(){
+    const code = (document.getElementById('sec2faCode').value||'').trim();
+    const msg = document.getElementById('sec2faMsg');
+    if(!code){ msg.textContent='Escribe el código.'; return; }
+    this.disabled=true; this.textContent='…';
+    const path = action==='disable' ? '/admin/2fa/disable' : '/admin/2fa/backup-codes';
+    try{
+      const r = await fetch(API+path, { method:'POST', headers: h2fa(true), body: JSON.stringify({ code }) });
+      const d = await r.json();
+      if(!r.ok){ msg.textContent = d.error||'No se pudo completar.'; this.disabled=false; this.textContent='Confirmar'; return; }
+      if(action==='disable') load2fa();
+      else showBackupCodes(d.backup_codes, 'Nuevos códigos de respaldo (los anteriores ya no sirven):');
+    }catch(e){ msg.textContent='Error de conexión.'; this.disabled=false; this.textContent='Confirmar'; }
+  };
+}
+
+function showBackupCodes(codes, intro){
+  const body = document.getElementById('sec2faBody');
+  const list = (codes||[]).map(c=>'<div>'+esc(c)+'</div>').join('');
+  body.innerHTML =
+    '<p style="margin:0 0 10px"><b>'+esc(intro)+'</b></p>'+
+    '<div style="font-family:var(--mono);font-size:15px;letter-spacing:.08em;background:var(--card-soft);padding:14px;border-radius:10px;line-height:1.9;user-select:all">'+list+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'+
+      '<button class="actbtn" id="btn2faCopy">Copiar códigos</button>'+
+      '<button class="actbtn off" id="btn2faDone">Listo</button></div>';
+  document.getElementById('btn2faCopy').onclick = function(){ try{ navigator.clipboard.writeText((codes||[]).join('\n')); this.textContent='Copiado ✓'; }catch(e){} };
+  document.getElementById('btn2faDone').onclick = load2fa;
 }
 
 function showError(msg){
