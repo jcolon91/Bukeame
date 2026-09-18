@@ -54,11 +54,14 @@
     injected = true;
   }
 
-  // Saca el id de banner del theme jsonb del negocio
+  // Saca el id de banner del theme jsonb del negocio. SOLO devuelve un id que exista
+  // en PRESETS: el theme lo escribe el dueño y termina dentro de clases/HTML, así que
+  // cualquier otro valor (texto con comillas, <img ...>) se descarta → 'teal-mesh'.
   function bannerId(theme) {
     try {
       const t = (typeof theme === 'string') ? JSON.parse(theme) : (theme || {});
-      return t.banner || 'teal-mesh';
+      const id = t && t.banner;
+      return (typeof id === 'string' && PRESETS.some(function (p) { return p.id === id; })) ? id : 'teal-mesh';
     } catch (e) { return 'teal-mesh'; }
   }
 

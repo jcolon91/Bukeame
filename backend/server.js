@@ -511,10 +511,28 @@ const authRequired = asyncH(async (req, res, next) => {
   next();
 });
 
+// ── Derecho EFECTIVO a funciones de pago — UNA sola regla para todo ─────────────
+// Un negocio está "al día" si su plan es de pago, la suscripción NO está cancelada,
+// el trial (si lo es) no venció y no pasaron los 7 días de gracia tras vencer el
+// período. Espeja a businessScope (abajo) para que el perfil público, el buscador y
+// el panel digan lo mismo aunque el worker expireBilling no haya corrido todavía.
+// Requiere los alias `s` (subscriptions) y `p` (plans) en la query. Con LEFT JOIN y
+// sin suscripción, s.plan_code es NULL → falla CERRADO (sin funciones de pago).
+const SQL_PAID_OK = `(s.plan_code IS NOT NULL AND s.plan_code <> 'free'
+    AND s.status <> 'cancelled'
+    AND NOT (s.status = 'trialing' AND (s.trial_ends_at IS NULL OR s.trial_ends_at <= now()))
+    AND (s.current_period_end IS NULL OR now() <= s.current_period_end + interval '7 days'))`;
+// Logo, banner y portafolio propios. Team/Grande/Ilimitado se insertaron SIN la llave
+// custom_branding (02-schema-v1.1.sql) → en un plan de pago, ausente cuenta como SÍ.
+const SQL_BRANDING_OK = `(${SQL_PAID_OK} AND COALESCE((p.features->>'custom_branding')::boolean, true))`;
+const SQL_DEPOSITS_OK = `(${SQL_PAID_OK} AND COALESCE((p.features->>'deposits')::boolean, false))`;
+const BRANDING_GRACE_MS = 7 * 864e5;
+
 // Carga el negocio del dueño (multi-tenant scope)
 const businessScope = asyncH(async (req, res, next) => {
   const { rows } = await db.query(
     `SELECT b.*, s.plan_code AS sub_plan, s.status AS sub_status, s.trial_ends_at,
+            s.current_period_end AS sub_period_end,
             p.max_staff, p.max_appts_month, p.features
        FROM businesses b
        JOIN subscriptions s ON s.business_id = b.id
@@ -529,7 +547,11 @@ const businessScope = asyncH(async (req, res, next) => {
   // funciones (cierra el trial que nunca expira y el uso de funciones sin pagar).
   const trialExpired = biz.sub_status === 'trialing'
     && (!biz.trial_ends_at || new Date(biz.trial_ends_at) <= new Date());
-  const notEntitled = biz.plan_code !== 'free' && (biz.sub_status === 'cancelled' || trialExpired);
+  // Plan de pago vencido hace más de los 7 días de gracia (aunque el worker aún no lo haya bajado).
+  // Igual que SQL_PAID_OK: la gracia aplica a cualquier status (también trialing).
+  const periodExpired = !!biz.sub_period_end
+    && (new Date(biz.sub_period_end).getTime() + BRANDING_GRACE_MS) < Date.now();
+  const notEntitled = biz.plan_code !== 'free' && (biz.sub_status === 'cancelled' || trialExpired || periodExpired);
   if (notEntitled) {
     const fp = await db.query(`SELECT max_staff, max_appts_month, features FROM plans WHERE code = 'free'`);
     biz.plan_code = 'free';
@@ -998,6 +1020,23 @@ app.get('/api/businesses/me', authRequired, businessScope, asyncH(async (req, re
 // logo_url/cover_url son editables pero VALIDADOS (solo null o una ruta /uploads/...
 // segura, ver guard en el PATCH). Antes, al ser texto libre, un dueño podía ponerlos
 // en "/uploads/logos/../../.env" y borrar archivos al cambiar/quitar el logo.
+// Valores permitidos del theme del negocio. MANTENER EN SYNC con PRESETS de
+// frontend/bukeame-banners.js y LOGO_BGS de frontend/panel.html.
+const THEME_BANNERS  = new Set(['teal-mesh','sunset','ocean','violet','rose','mango-sun',
+  'wine-wave','forest','carbon-lines','graphite-dots','mint','sand']);
+const THEME_LOGO_BGS = new Set(['teal','forest','earth','sage','sand']);
+function cleanTheme(v) {
+  let t = v;
+  if (typeof t === 'string') { try { t = JSON.parse(t); } catch (e) { t = {}; } }
+  if (!t || typeof t !== 'object' || Array.isArray(t)) t = {};
+  const out = {};
+  if (typeof t.banner === 'string' && THEME_BANNERS.has(t.banner)) out.banner = t.banner;
+  if (typeof t.logo_bg === 'string' && THEME_LOGO_BGS.has(t.logo_bg)) out.logo_bg = t.logo_bg;
+  if (typeof t.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(t.accent)) out.accent = t.accent;
+  if (t.mode === 'light' || t.mode === 'dark') out.mode = t.mode;
+  return out;
+}
+
 const BIZ_EDITABLE = ['name','bio','phone','whatsapp','email','address_line','municipality_id',
   'lat','lng','logo_url','cover_url','theme','social','ath_phone','deposit_default_cents',
   'cancellation_hours','no_show_policy','booking_lead_min','booking_horizon_days',
@@ -1035,6 +1074,10 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
     if ((k === 'logo_url' || k === 'cover_url') && v != null &&
         (typeof v !== 'string' || !/^\/uploads\/(logos|covers)\/[A-Za-z0-9._-]+$/.test(v)))
       return bad(res, `${k} inválido`);
+    // Plan free: NO puede poner logo/banner por aquí (saltándose el 403 de la subida
+    // apuntando a un archivo ya existente). Quitarlos (null) siempre se permite.
+    if ((k === 'logo_url' || k === 'cover_url') && v != null && req.business.plan_code === 'free')
+      return bad(res, 'El logo y el banner propios están disponibles desde el plan Pro.', 403);
     // numéricos: rechaza fuera de rango (no number, no entero o fuera de límites)
     if (k in BIZ_NUM_RANGES) {
       const n = Number(v), [lo, hi] = BIZ_NUM_RANGES[k];
@@ -1042,6 +1085,10 @@ app.patch('/api/businesses/me', authRequired, businessScope, asyncH(async (req, 
         return bad(res, `${k} fuera de rango (${lo}..${hi})`);
       v = n;
     }
+    // theme: solo llaves y valores que existen. Antes entraba cualquier cosa: HTML en
+    // theme.banner era un XSS guardado en el perfil público, y theme.accent se metía
+    // sin validar en el style de los recibos por email.
+    if (k === 'theme') v = cleanTheme(v);
     vals.push(v); sets.push(`${k} = $${vals.length}`);
   }
   // policies: arreglo de strings que el negocio edita (cada uno <=200 chars, máx 20, saneados)
@@ -1170,6 +1217,13 @@ const PORTFOLIO_MAX = 8;
 
 // Subir una foto al portafolio
 app.post('/api/businesses/me/portfolio', authRequired, businessScope,
+  (req, res, next) => {
+    // Plan efectivo free (incluye trial vencido / cancelado / vencido tras la gracia):
+    // el portafolio es función de pago. Se bloquea ANTES de procesar la imagen.
+    if (req.business.plan_code === 'free')
+      return bad(res, 'El portafolio de fotos está disponible desde el plan Pro. Si ya tenías fotos, siguen guardadas y vuelven a verse al renovar.', 403);
+    next();
+  },
   (req, res, next) => uploadLogo.single('photo')(req, res, (err) => {
     if (err) return bad(res, err.message || 'Error al subir la foto');
     next();
@@ -1913,13 +1967,18 @@ app.get('/api/public/search', publicLimiter, publicCache, asyncH(async (req, res
   }
 
   const { rows } = await db.query(
-    `SELECT b.id, b.slug, b.name, b.bio, b.logo_url, b.cover_url, b.rating_avg, b.rating_count,
+    `SELECT b.id, b.slug, b.name, b.bio,
+            CASE WHEN ${SQL_BRANDING_OK} THEN b.logo_url END AS logo_url,
+            CASE WHEN ${SQL_BRANDING_OK} THEN b.cover_url END AS cover_url,
+            b.rating_avg, b.rating_count,
             b.is_featured, m.name AS municipality, ${distSel},
             (SELECT json_agg(json_build_object('name', c.name_es, 'slug', c.slug))
                FROM business_categories bc JOIN categories c ON c.id = bc.category_id
               WHERE bc.business_id = b.id) AS categories
        FROM businesses b
        LEFT JOIN pr_municipalities m ON m.id = b.municipality_id
+       LEFT JOIN subscriptions s ON s.business_id = b.id
+       LEFT JOIN plans p ON p.code = s.plan_code
       WHERE ${where.join(' AND ')}
       ORDER BY (EXISTS (SELECT 1 FROM featured_listings fl WHERE fl.business_id = b.id AND fl.ends_at > now())) DESC,
                ${rank} DESC NULLS LAST, b.rating_count DESC
@@ -1961,7 +2020,10 @@ app.get('/api/public/discover', publicLimiter, publicCache, asyncH(async (req, r
     if (extraWhere) where.push(extraWhere);
 
     const { rows } = await db.query(
-      `SELECT b.slug, b.name, b.logo_url, b.cover_url, b.rating_avg, b.rating_count,
+      `SELECT b.slug, b.name,
+              CASE WHEN ${SQL_BRANDING_OK} THEN b.logo_url END AS logo_url,
+              CASE WHEN ${SQL_BRANDING_OK} THEN b.cover_url END AS cover_url,
+              b.rating_avg, b.rating_count,
               m.name AS municipality, ${distSel},
               (SELECT c.name_es
                  FROM business_categories bc JOIN categories c ON c.id = bc.category_id
@@ -1970,6 +2032,8 @@ app.get('/api/public/discover', publicLimiter, publicCache, asyncH(async (req, r
                 LIMIT 1) AS category
          FROM businesses b
          LEFT JOIN pr_municipalities m ON m.id = b.municipality_id
+         LEFT JOIN subscriptions s ON s.business_id = b.id
+         LEFT JOIN plans p ON p.code = s.plan_code
         WHERE ${where.join(' AND ')}
         ORDER BY ${orderBy}
         LIMIT ${limit}`, vals);
@@ -2018,11 +2082,14 @@ app.get('/api/public/discover', publicLimiter, publicCache, asyncH(async (req, r
 app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
     `SELECT b.id, b.slug, b.name, b.bio, b.phone, b.whatsapp, b.address_line, b.lat, b.lng,
-            b.logo_url, b.cover_url, b.theme, b.social, b.rating_avg, b.rating_count,
+            CASE WHEN ${SQL_BRANDING_OK} THEN b.logo_url END AS logo_url,
+            CASE WHEN ${SQL_BRANDING_OK} THEN b.cover_url END AS cover_url,
+            b.theme, b.social, b.rating_avg, b.rating_count,
             b.cancellation_hours, b.no_show_policy, b.deposit_default_cents, b.booking_horizon_days,
             b.policies,
             m.name AS municipality,
-            (s.plan_code <> 'free' AND (p.features->>'deposits')::boolean) AS deposits_enabled
+            ${SQL_DEPOSITS_OK} AS deposits_enabled,
+            ${SQL_BRANDING_OK} AS branding_ok
        FROM businesses b
        LEFT JOIN pr_municipalities m ON m.id = b.municipality_id
        JOIN subscriptions s ON s.business_id = b.id
@@ -2089,10 +2156,14 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
                    WHERE p.business_id = $1 AND p.is_active = true
                    ORDER BY p.name`, [biz.id])
           .catch(() => ({ rows: [] }))),
-    // Galería / portafolio del negocio (resiliente si la tabla aún no existe)
-    db.query(`SELECT url, caption FROM gallery_photos
-              WHERE business_id = $1 ORDER BY sort_order`, [biz.id])
-      .catch(() => ({ rows: [] })),
+    // Galería / portafolio del negocio (resiliente si la tabla aún no existe).
+    // Solo con branding de pago: si no, ni se consulta (las fotos quedan GUARDADAS,
+    // no se borran, y reaparecen solas al renovar).
+    biz.branding_ok
+      ? db.query(`SELECT url, caption FROM gallery_photos
+                  WHERE business_id = $1 ORDER BY sort_order`, [biz.id])
+          .catch(() => ({ rows: [] }))
+      : Promise.resolve({ rows: [] }),
   ]);
   // Datos PÚBLICOS para cobrar (solo métodos activos + conectados). El public_token
   // de ATH es público por diseño (va en el botón client-side); es seguro exponerlo.
@@ -2118,6 +2189,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     // Efectivo: el cliente paga en persona; el negocio valida y acepta la cita.
     cash: byProv['cash'] ? { enabled: true } : null,
   };
+  delete biz.branding_ok;   // uso interno (galería); no se expone
   res.json({
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
     payment_methods: payMethods.rows.map(r => r.provider),
@@ -2275,7 +2347,7 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
   if (isNaN(starts) || starts < new Date()) return bad(res, 'Horario inválido');
 
   const b = await db.query(
-    `SELECT b.*, (s.plan_code <> 'free' AND (p.features->>'deposits')::boolean) AS deposits_enabled,
+    `SELECT b.*, ${SQL_DEPOSITS_OK} AS deposits_enabled,
             s.plan_code, p.max_appts_month
        FROM businesses b
        JOIN subscriptions s ON s.business_id = b.id
@@ -3497,7 +3569,10 @@ function emailReceipt(ctx){
   const biz = ctx.biz || {};
   const inv = biz.invoice_settings || {};
   let theme = {}; try { theme = (typeof biz.theme === 'string') ? JSON.parse(biz.theme) : (biz.theme || {}); } catch(e){}
-  const accent = /^#[0-9a-fA-F]{6}$/.test(inv.brand_color || '') ? inv.brand_color : (theme.accent || '#0E8074');
+  // theme.accent también se valida al LEER (datos viejos guardados antes de cleanTheme):
+  // va dentro de un atributo style del correo y no puede traer HTML.
+  const accent = /^#[0-9a-fA-F]{6}$/.test(inv.brand_color || '') ? inv.brand_color
+    : (/^#[0-9a-fA-F]{6}$/.test(theme.accent || '') ? theme.accent : '#0E8074');
   const brand  = emailEsc(inv.legal_name || biz.name || 'Tu negocio');
   const addr   = emailEsc(inv.address_line || biz.address_line || '');
   const footer = emailEsc(inv.footer_note || '');

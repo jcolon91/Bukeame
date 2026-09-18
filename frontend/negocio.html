@@ -1108,7 +1108,7 @@ function renderHeroGallery(){
     if(window.BukeameBanners){
       BukeameBanners.injectCss();
       var bnrId = BukeameBanners.bannerId(b.theme);
-      host.innerHTML = '<div class="bk-shot bk-prefab tbanner bnr-'+bnrId+'"><span>'+esc(initial)+'</span></div>';
+      host.innerHTML = '<div class="bk-shot bk-prefab tbanner bnr-'+esc(bnrId)+'"><span>'+esc(initial)+'</span></div>';
     } else {
       // Respaldo: degradado de marca con inicial del negocio
       host.innerHTML = '<div class="bk-shot bk-fallback"><span>'+esc(initial)+'</span></div>';
@@ -1240,7 +1240,7 @@ function renderServices(){
 
   // ── Modal: markup .svc original (toggle de selección múltiple) — sin cambios ──
   var modalHtml = state.services.map(function(s){
-    var dep = s.deposit_cents>0 ? '<span style="color:var(--ink2)">'+money(s.deposit_cents)+' de depósito</span>' : '';
+    var dep = (depositsOn() && s.deposit_cents>0) ? '<span style="color:var(--ink2)">'+money(s.deposit_cents)+' de depósito</span>' : '';
     return '<div class="svc" data-id="'+esc(s.id)+'"><div class="grow"><h4>'+esc(s.name)+'</h4><p>'+s.duration_min+' min'+(s.description?(' · '+esc(s.description)):'')+'</p></div><div class="price"><b>'+money(s.price_cents)+'</b>'+dep+'</div></div>';
   }).join('');
   list.innerHTML = modalHtml;
@@ -1252,8 +1252,12 @@ function renderServices(){
   renderServicePreview();
 }
 
+// ¿El negocio cobra depósito? Lo decide el servidor según el plan (deposits_enabled);
+// si no, NO se anuncia "$X de depósito" aunque el servicio tenga un monto guardado.
+function depositsOn(){ return !!(state.biz && state.biz.deposits_enabled); }
+
 function svcRowHtml(s){
-  var dep = s.deposit_cents>0 ? '<span class="bk-dep">'+money(s.deposit_cents)+' de depósito</span>' : '';
+  var dep = (depositsOn() && s.deposit_cents>0) ? '<span class="bk-dep">'+money(s.deposit_cents)+' de depósito</span>' : '';
   var clock = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var desc = s.description ? '<div class="bk-svc-desc">'+esc(s.description)+'</div>' : '';
   return '<div class="bk-svc">'+
@@ -1612,7 +1616,7 @@ document.getElementById('confirmBtn').onclick = async function(){
     state.appt = appt;
     // Depósito requerido: usar el del backend si viene, si no, sumar el de los servicios elegidos
     var depFromSvc = state.selectedServices.reduce(function(t,x){ return t + (x.deposit_cents||0); }, 0);
-    var depCents = (appt.deposit_cents!=null ? appt.deposit_cents : depFromSvc) || 0;
+    var depCents = (appt.deposit_cents!=null ? appt.deposit_cents : (depositsOn() ? depFromSvc : 0)) || 0;
     state.depCents = depCents;
     if(depCents>0){
       renderPayStep(appt, depCents);

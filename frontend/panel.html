@@ -678,6 +678,12 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <section class="view" id="view-negocio">
         <div class="tophead"><div><h1>Mi negocio</h1><p>Información que ven tus clientes.</p></div></div>
         <div class="alert" id="bizAlert"></div>
+        <!-- Aviso: plan gratis con imágenes guardadas que NO se muestran en la página pública -->
+        <div id="brandingHiddenNote" style="display:none;background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:12px;padding:14px 16px;margin-bottom:18px;font-size:13.5px;color:var(--warn-ink);line-height:1.55">
+          <b>Tu logo, tu banner y tu portafolio no se están mostrando en tu página.</b>
+          Son funciones del plan Pro y tu plan está en Gratis. No se borró nada: tus imágenes siguen guardadas y vuelven a verse solas en cuanto renueves.
+          <div class="ios-hide-purchase" style="margin-top:10px"><button type="button" class="btn btn-teal btn-sm" id="brandingRenewBtn">Ver planes</button></div>
+        </div>
         <div class="card">
           <div class="seclabel">Logo del negocio</div>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -1248,6 +1254,8 @@ function planRank(code){
 }
 // ¿El plan actual está en Studio o superior?
 function planIsStudioPlus(){ return planRank(BIZ && BIZ.plan_code) >= planRank('studio'); }
+// Muestra el aviso "tus imágenes no se muestran en tu página" (plan gratis con fotos guardadas).
+function showBrandingNote(){ var n = document.getElementById('brandingHiddenNote'); if(n) n.style.display = 'block'; }
 
 // ── Días libres / bloqueos ─────────────────────────────────────────────────
 async function loadBlocks(){
@@ -2054,6 +2062,13 @@ function fillBusiness(data){
     document.getElementById('invShowLogo').checked = !!inv.show_logo;
   } catch(e){}
   try { policiesInit(b.policies); } catch(e){ console.error('policiesInit', e); }
+  // Aviso de imágenes ocultas por plan: el dueño las ve aquí, pero el público no
+  // (el backend no las sirve en plan gratis). Se decide con el plan EFECTIVO.
+  try {
+    if((b.plan_code || 'free') === 'free' && (b.logo_url || b.cover_url)) showBrandingNote();
+    var _rb = document.getElementById('brandingRenewBtn');
+    if(_rb) _rb.onclick = function(){ switchView('cuenta'); };
+  } catch(e){}
   // ── Logo del negocio (premium: Pro+) ──
   (function(){
     var isFree = (b.plan_code || 'free') === 'free';
@@ -3018,6 +3033,8 @@ async function loadPortfolio(){
   const grid = document.getElementById('pfGrid');
   const r = await api('GET','/businesses/me/portfolio');
   const photos = (r.ok && r.data.photos) ? r.data.photos : [];
+  // Plan gratis con fotos guardadas: no salen en la página pública → avisar.
+  if(photos.length && typeof BIZ !== 'undefined' && BIZ && (BIZ.plan_code || 'free') === 'free') showBrandingNote();
   if(photos.length === 0){
     grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Aún no tienes fotos en tu portafolio.</div>';
   } else {
