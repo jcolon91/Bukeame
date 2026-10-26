@@ -1035,7 +1035,8 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       </div>
       <p id="apRepeatHint" style="font-size:12px;color:var(--ink2);margin-top:5px;display:none">Crea varias citas seguidas a la misma hora y día. Las que choquen con otra cita se saltan.</p>
     </div>
-    <label style="display:flex;gap:8px;font-size:13px;color:var(--ink2);margin-bottom:14px;cursor:pointer"><input type="checkbox" id="apWalkin"> Es walk-in (llegó sin reservar)</label>
+    <label style="display:flex;gap:8px;font-size:13px;color:var(--ink2);margin-bottom:6px;cursor:pointer"><input type="checkbox" id="apWalkin"> Es walk-in (llegó sin reservar)</label>
+    <p style="font-size:12px;color:var(--ink2);margin-bottom:14px">Al cliente le llega la confirmación por WhatsApp (a los walk-in no). Si repites, recibe un solo mensaje con sus fechas.</p>
     <div style="display:flex;gap:10px">
       <button class="btn btn-ghost btn-sm" id="apCancel" style="flex:1">Cancelar</button>
       <button class="btn btn-teal btn-sm" id="apSave" style="flex:1">Crear cita</button>
@@ -1775,10 +1776,12 @@ document.getElementById('addApptBtn').onclick = async function(){
   if(staffList.length===1) stfSel.value = staffList[0].id;
   // fecha de hoy por defecto
   document.getElementById('apDate').value = new Date().toLocaleDateString('en-CA',{timeZone:'America/Puerto_Rico'});
-  // reset del selector de repetición
+  // reset del selector de repetición y del walk-in (marcado de la vez anterior,
+  // dejaría al cliente sin su confirmación)
   document.getElementById('apRepeat').value = '0';
   document.getElementById('apRepeatN').style.display = 'none';
   document.getElementById('apRepeatHint').style.display = 'none';
+  document.getElementById('apWalkin').checked = false;
   apptModal.classList.add('on');
 };
 document.getElementById('apCancel').onclick = function(){ apptModal.classList.remove('on'); };
@@ -1806,31 +1809,47 @@ document.getElementById('apSave').onclick = async function(){
     // que sumar días en ms mantiene la hora local exacta.
     const nTimes = Math.max(2, Math.min(26, parseInt(document.getElementById('apRepeatN').value,10)||2));
     const base = new Date(date+'T00:00:00');
-    let created=0, skipped=0, firstErr='';
-    for(let i=0;i<nTimes;i++){
-      const d = new Date(base.getTime() + i*repeatDays*86400000);
-      const ymd = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      const ri = await api('POST','/appointments', mkBody(ymd));
-      if(ri.ok) created++; else { skipped++; if(!firstErr) firstErr=(ri.data&&ri.data.error)||''; }
+    let created=0, skipped=0, firstErr='', queued=false;
+    const ids=[];
+    try{
+      for(let i=0;i<nTimes;i++){
+        const d = new Date(base.getTime() + i*repeatDays*86400000);
+        const ymd = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        // Sin notify: el cliente recibe UN solo aviso con todas sus fechas al final.
+        const ri = await api('POST','/appointments', mkBody(ymd));
+        if(ri.ok){ created++; if(ri.data&&ri.data.appointment) ids.push(ri.data.appointment.id); }
+        else { skipped++; if(!firstErr) firstErr=(ri.data&&ri.data.error)||''; }
+      }
+    } catch(e){
+      if(!firstErr) firstErr='Se cortó la conexión a mitad.';
+    } finally {
+      // Aunque el ciclo se corte (conexión), las fechas que sí se crearon reciben su aviso.
+      if(ids.length && !walkin){
+        try{ const sc = await api('POST','/appointments/series-confirm',{ appointment_ids: ids }); queued = !!(sc.ok && sc.data && sc.data.queued); }catch(e){}
+      }
+      btn.disabled=false; btn.textContent='Crear cita';
     }
-    btn.disabled=false; btn.textContent='Crear cita';
     if(created>0){
       apptModal.classList.remove('on');
       document.getElementById('apName').value=''; document.getElementById('apPhone').value='';
+      document.getElementById('apWalkin').checked = false;
       loadDashboard();
-      if(window.bkToast) bkToast('Se crearon '+created+' de '+nTimes+' citas'+(skipped?(' · '+skipped+' se saltaron por choque de horario'):''));
+      if(window.bkToast) bkToast('Se crearon '+created+' de '+nTimes+' citas'+(skipped?(' · '+skipped+' se saltaron por choque de horario'):'')+(queued?' · le enviamos la confirmación al cliente':''));
     }else{
       showAlert('apptAlert', 'No se creó ninguna cita. '+(firstErr||'Revisa el horario y los choques.'), false);
     }
     return;
   }
 
-  const r = await api('POST','/appointments', mkBody(date));
+  const one = mkBody(date); if(!walkin) one.notify = true;   // la cita sola sí pide su confirmación
+  const r = await api('POST','/appointments', one);
   btn.disabled=false; btn.textContent='Crear cita';
   if(r.ok){
     apptModal.classList.remove('on');
     document.getElementById('apName').value=''; document.getElementById('apPhone').value='';
+    document.getElementById('apWalkin').checked = false;
     loadDashboard();
+    if(window.bkToast && r.data && r.data.notified) bkToast('Cita creada · le enviamos la confirmación al cliente');
   }else{
     showAlert('apptAlert', r.data.error||'No se pudo crear la cita.', false);
   }

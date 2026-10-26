@@ -3202,9 +3202,25 @@ app.get('/api/appointments', authRequired, businessScope, asyncH(async (req, res
   res.json({ date, appointments: rows });
 }));
 
-// Cita manual / walk-in desde el panel
+// Tope de confirmaciones de citas del panel por negocio (24 h). El WhatsApp sale del
+// número compartido de Bukéame: sin tope, una cuenta podría usar "cita manual" para
+// mandar mensajes en masa a cualquier número y hacer que WhatsApp lo bloquee.
+const MANUAL_NOTIFY_PER_DAY = 40;
+async function manualNotifyAllowed(businessId) {
+  const { rows } = await db.query(
+    `SELECT count(*)::int n FROM message_log m JOIN appointments a ON a.id = m.appointment_id
+      WHERE m.business_id = $1 AND m.channel = 'whatsapp' AND m.template IN ('confirm','confirm_series')
+        AND a.source = 'manual' AND m.created_at > now() - interval '24 hours'`, [businessId]);
+  return rows[0].n < MANUAL_NOTIFY_PER_DAY;
+}
+
+// Cita manual / walk-in desde el panel. Con notify:true (lo manda el panel nuevo en la
+// cita sola, no walk-in) se le envía la confirmación al cliente. Es opt-in a propósito:
+// un panel viejo abierto desde antes del deploy no manda nada (si fuera por defecto,
+// al repetir mandaría un aviso por fecha). Al repetir, el panel no lo manda y al final
+// pide UN solo aviso con series-confirm (abajo).
 app.post('/api/appointments', authRequired, businessScope, asyncH(async (req, res) => {
-  const { service_id, staff_id, start_iso, full_name, phone, source } = req.body || {};
+  const { service_id, staff_id, start_iso, full_name, phone, source, notify } = req.body || {};
   if (!isUuid(service_id) || !isUuid(staff_id)) return bad(res, 'Servicio y profesional requeridos');
   if (!isStr(full_name, 120) || !isPhone(phone)) return bad(res, 'Nombre y teléfono del cliente requeridos');
   const starts = new Date(start_iso || '');
@@ -3232,11 +3248,33 @@ app.post('/api/appointments', authRequired, businessScope, asyncH(async (req, re
       [req.business.id, cl.rows[0].id, staff_id, s.id, s.name, s.duration_min, s.price_cents,
        starts, new Date(starts.getTime() + s.duration_min * 60_000),
        source === 'walk_in' ? 'walk_in' : 'manual', code]);
-    res.status(201).json({ appointment: rows[0] });
+    let notified = false;
+    if (source !== 'walk_in' && notify === true && starts > new Date() && await manualNotifyAllowed(req.business.id)) {
+      await enqueueApptConfirm(req.business.id, rows[0].id);
+      notified = true;
+    }
+    res.status(201).json({ appointment: rows[0], notified });
   } catch (e) {
     if (e.code === '23P01') return bad(res, 'Ese profesional ya tiene una cita en ese horario', 409);
     throw e;
   }
+}));
+
+// Cliente fijo: el panel creó varias citas seguidas (notify:false) y pide UN solo aviso
+// con la lista de sus próximas citas. Se cuelga de la más temprana de la serie.
+app.post('/api/appointments/series-confirm', authRequired, businessScope, asyncH(async (req, res) => {
+  const ids = Array.isArray(req.body?.appointment_ids) ? req.body.appointment_ids.filter(isUuid).slice(0, 30) : [];
+  if (!ids.length) return bad(res, 'Faltan las citas');
+  const { rows } = await db.query(
+    `SELECT id, client_id FROM appointments
+      WHERE id = ANY($1::uuid[]) AND business_id = $2 AND status = ANY($3) AND starts_at > now()
+        AND source = 'manual'
+      ORDER BY starts_at`, [ids, req.business.id, ALIVE]);
+  if (!rows.length) return res.json({ ok: true, queued: false });
+  if (new Set(rows.map(r => r.client_id)).size > 1) return bad(res, 'Las citas son de clientes distintos');
+  if (!(await manualNotifyAllowed(req.business.id))) return res.json({ ok: true, queued: false });
+  await enqueueClientMsg(req.business.id, rows[0].id, 'confirm_series');
+  res.json({ ok: true, queued: true });
 }));
 
 // Cambiar estado (completed / no_show / cancelled_business) o reagendar
@@ -3507,6 +3545,13 @@ function bizWaLink(biz) {
   return n.length >= 11 ? `https://wa.me/${n}` : '';
 }
 
+// Fechas de la serie de un cliente fijo (las carga dispatchBatch) y el código de la
+// próxima, para el enlace. Sin lista, cae a la cita de la fila.
+function seriesInfo(ctx, appt) {
+  const rows = ctx.series && ctx.series.length ? ctx.series : [{ starts_at: appt.starts_at, confirmation_code: appt.confirmation_code, total: 1 }];
+  return { dates: rows.map(r => r.starts_at), code: rows[0].confirmation_code, more: Math.max(0, Number(rows[0].total || rows.length) - rows.length) };
+}
+
 function buildMessage(template, ctx) {
   const { biz, appt } = ctx;
   const when = appt?.starts_at ? fmtPR(appt.starts_at) : '';
@@ -3526,6 +3571,12 @@ function buildMessage(template, ctx) {
             + (biz.ath_phone ? `(o envíalo por ATH Móvil al ${biz.ath_phone} y pon la referencia en ese mismo enlace)\n` : '')
             + `\n⏳ *Importante:* tu turno queda reservado por *30 minutos* mientras se valida el depósito. Si no se valida a tiempo, el turno se libera.`
           : `\nVer o cancelar tu cita: ${link}`);
+    case 'confirm_series': {
+      const s = seriesInfo(ctx, appt);
+      return `✅ *${biz.name}*\nTus citas fijas quedaron así:\n\n💈 ${appt.service_name}\n${s.dates.map(d => `🗓 ${fmtPR(d)}`).join('\n')}`
+        + (s.more ? `\n…y ${s.more} más` : '')
+        + `\n\nTe recordamos el día antes de cada una. Ver o cancelar la próxima: ${citaUrl(s.code)}`;
+    }
     case 'hold_expired':
       return `⌛ *${biz.name}*\nTu reserva de *${appt.service_name}* (${when}) no quedó registrada: el depósito no se validó dentro de los 30 minutos y el turno se liberó.\n\nSi YA enviaste el depósito, contacta al negocio para que valide tu pago y te reubique${waLink ? `: ${waLink}` : ''}. Si no, puedes reservar de nuevo cuando quieras. 🙏`;
     case 'reminder_48h':
@@ -3819,6 +3870,13 @@ function emailAppt(template, ctx) {
         extra = `Para confirmarla, paga el depósito de $${(appt.deposit_cents / 100).toFixed(2)} ${a(citaUrl(code), 'aquí')}`
           + (biz.ath_phone ? ` (o envíalo por ATH Móvil al ${emailEsc(biz.ath_phone)} y pon la referencia en ese mismo enlace).` : '.');
       break;
+    case 'confirm_series': {
+      const s = seriesInfo(ctx, appt);
+      title = 'Tus citas fijas';
+      intro = `Te recordamos el día antes de cada una. ${a(citaUrl(s.code), 'Ver o cancelar la próxima')}.`;
+      extra = s.dates.map(d => emailEsc(fmtPR(d))).join('<br>') + (s.more ? `<br>…y ${s.more} más` : '');
+      break;
+    }
     case 'rescheduled':
       title = 'El negocio movió tu cita';
       intro = `Así queda tu cita (fecha y hora de arriba). Si no te funciona, ${contactHtml}.`;
@@ -3858,11 +3916,13 @@ function emailAppt(template, ctx) {
       intro = '';
   }
   const subject = `${title} — ${biz.name}`;
+  // La serie lleva sus fechas abajo: la fecha y el código de la primera podrían ya no valer.
+  const one = template !== 'confirm_series';
   const rowsArr = [
     ['Servicio', svc],
-    ['Fecha', when],
-    code ? ['Código', code] : null,
-    (code && template !== 'cancelled_business' && template !== 'hold_expired')
+    one ? ['Fecha', when] : null,
+    (one && code) ? ['Código', code] : null,
+    (one && code && template !== 'cancelled_business' && template !== 'hold_expired')
       ? ['Tu cita', a(citaUrl(code), 'Ver o cancelar')] : null,
     (template === 'reminder_2h' && addr) ? ['Lugar', addr] : null,
     (template === 'reminder_2h' && mapUrl)
@@ -3928,6 +3988,7 @@ checkMsgV2()
 // Avisos atados a una cita activa: si la cita ya pasó o se canceló antes de salir
 // (p.ej. mientras esperaba un reintento), no se mandan.
 const APPT_TEMPLATES = new Set(['confirm', 'reminder_48h', 'reminder_24h', 'reminder_2h', 'reminder_1h', 'manual_assign', 'rescheduled']);
+const SERIES_SHOWN = 12;   // fechas que se listan en "tus citas fijas"; si hay más, "y N más"
 const RETRY_DELAYS_MIN = [5, 30];   // 1er fallo → reintenta en 5 min; 2do → en 30; 3ro → 'failed'
 
 // Un recordatorio solo sale si la cita sigue cayendo en su ventana (p.ej. tras un
@@ -3943,6 +4004,8 @@ function staleReason(m) {
     const h = (new Date(m.starts_at) - Date.now()) / 3600_000;
     if (win && (h < win[0] || h > win[1])) return 'el recordatorio ya no cae en su hora';
   }
+  // La serie no depende de su primera fecha: sale mientras quede alguna cita viva.
+  if (m.template === 'confirm_series' && !(m.series && m.series.length)) return 'no quedan citas de la serie';
   if (m.template === 'cancelled_business' && m.status !== 'cancelled_business') return 'la cita se reactivó';
   if (m.template === 'waitlist_offer' && m.appointment_id && !m.waitlist_id) return 'la oferta ya no está vigente';
   return null;
@@ -3974,6 +4037,17 @@ async function dispatchBatch() {
       WHERE m.status = 'queued'${MSG_V2 ? ' AND (m.next_attempt_at IS NULL OR m.next_attempt_at <= now())' : ''}
       ORDER BY m.created_at LIMIT 20`);
   for (const m of rows) {
+    // Cliente fijo: la lista sale al momento de enviar, solo con las que siguen vivas y
+    // a futuro (mismo cliente, profesional y servicio, desde la primera de la serie).
+    if (m.template === 'confirm_series') {
+      m.series = (await db.query(
+        `SELECT x.starts_at, x.confirmation_code, count(*) OVER () AS total
+           FROM appointments x JOIN appointments a ON a.id = $1
+          WHERE x.business_id = a.business_id AND x.client_id = a.client_id
+            AND x.staff_id = a.staff_id AND x.service_id IS NOT DISTINCT FROM a.service_id
+            AND x.status = ANY($2) AND x.starts_at >= a.starts_at AND x.starts_at > now()
+          ORDER BY x.starts_at LIMIT $3`, [m.appointment_id, ALIVE, SERIES_SHOWN])).rows;
+    }
     const skip = staleReason(m);
     if (skip) {
       await db.query(`UPDATE message_log SET status = $2::msg_status, error = $3 WHERE id = $1`,
@@ -3986,6 +4060,7 @@ async function dispatchBatch() {
       appt: m,
       offerUrl: m.waitlist_id ? `${SITE_URL}/oferta.html?id=${m.waitlist_id}` : null,
     };
+    if (m.series) ctx.series = m.series;
     try {
       let out;
       if (m.channel === 'whatsapp') {
