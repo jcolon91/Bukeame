@@ -57,5 +57,21 @@ const q = async (sql) => (await db.query(sql)).rows;
                         WHERE status IN ('confirmed','completed') AND starts_at BETWEEN now() - interval '7 days' AND now()
                           AND created_at < starts_at - interval '25 hours' AND reminder_24h_sent_at IS NULL`);
   out('  citas de los últimos 7 días que debían tener recordatorio 24 h y no lo tienen:', m.n);
+
+  // Misma regla que SQL_PAID_OK (commit 06284c8): quién conserva logo/banner/portafolio
+  // y depósitos cuando se suba el gating del plan gratis.
+  out('=== Negocios y su plan (pago_ok = conserva logo y depósitos con la regla nueva) ===');
+  for (const b of await q(`SELECT b.slug, s.plan_code, s.status, s.trial_ends_at, s.current_period_end,
+          (s.plan_code IS NOT NULL AND s.plan_code <> 'free' AND s.status <> 'cancelled'
+           AND NOT (s.status = 'trialing' AND (s.trial_ends_at IS NULL OR s.trial_ends_at <= now()))
+           AND (s.current_period_end IS NULL OR now() <= s.current_period_end + interval '7 days')) AS pago_ok,
+          COALESCE(s.plan_code <> 'free' AND (p.features->>'deposits')::boolean, false) AS deposits_enabled,
+          (b.logo_url IS NOT NULL) AS tiene_logo
+     FROM businesses b LEFT JOIN subscriptions s ON s.business_id = b.id
+     LEFT JOIN plans p ON p.code = s.plan_code
+    ORDER BY b.created_at DESC LIMIT 30`))
+    out('  ' + String(b.slug).padEnd(28) + String(b.plan_code).padEnd(10) + String(b.status).padEnd(10),
+      'prueba:', fmt(b.trial_ends_at), ' periodo:', fmt(b.current_period_end),
+      ' pago_ok:', b.pago_ok ? 'SÍ' : 'NO', ' depósitos:', b.deposits_enabled ? 'sí' : 'no', ' logo:', b.tiene_logo ? 'sí' : 'no');
   await db.end();
 })().catch((e) => { out('ERROR del diagnóstico:', e.message); process.exit(1); });
