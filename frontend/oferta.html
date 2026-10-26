@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Turno disponible — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Se liberó un turno para ti en la lista de espera. Tómalo antes de que pase al siguiente.">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='800' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+  --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+  --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+  --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+  --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{color-scheme:dark;
+  --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+  --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+  --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+  --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.awning{height:12px;background:var(--awning)}
+.topbar{background:var(--card);color:var(--muted);text-align:center;padding:7px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 14px;border-bottom:1px solid var(--border)}
+.topbar b{color:var(--green);font-weight:700}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:999px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:480px;margin:0 auto;padding:30px 18px}
+h1{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;text-align:center;margin-bottom:6px}
+.sub{text-align:center;color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.5}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:22px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.bizname{font-family:var(--display);font-weight:800;font-size:20px;text-align:center;margin-bottom:4px}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:4px 12px;border-radius:99px;background:var(--green-soft);color:var(--green)}
+.detail .row{display:flex;justify-content:space-between;gap:12px;font-size:14.5px;padding:9px 0;border-bottom:1px solid var(--border)}
+.detail .row:last-child{border-bottom:0}
+.detail .row span:first-child{color:var(--muted)}
+.detail .row b{text-align:right}
+.note{background:var(--green-soft);border:1px solid var(--border);border-radius:12px;padding:11px 14px;font-size:13px;color:var(--text);line-height:1.5;margin-bottom:14px}
+.note.warn{background:#FBEFD8;border-color:#F0D9AE;color:#5c3d0c}
+html[data-theme="dark"] .note.warn{background:rgba(239,161,47,.14);border-color:rgba(239,161,47,.3);color:#EFC98A}
+.timer{text-align:center;font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.04em;color:var(--muted);margin:4px 0 16px}
+.timer b{color:var(--text)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font-weight:700;font-size:15px;padding:14px;border-radius:14px;cursor:pointer;margin-bottom:10px;transition:transform .12s ease,opacity .12s ease}
+.btn:active{transform:translateY(1px)}
+.btn-teal{background:var(--green);color:var(--green-ink);box-shadow:0 6px 18px -8px var(--green-glow)}
+.btn-dark{background:var(--card);border:1.5px solid var(--border);color:var(--text)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.alert{display:none;font-size:13px;font-weight:600;padding:12px 14px;border-radius:12px;margin-bottom:14px;line-height:1.5}
+.alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+.code{font-family:var(--mono);font-weight:700;font-size:20px;letter-spacing:.08em;text-align:center;padding:12px;border:1.5px dashed var(--border);border-radius:12px;margin:6px 0 16px}
+.view{display:none}.view.on{display:block}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:24px 0 40px}
+</style>
+<script src="bukeame-core.js"></script>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div class="topbar">Reservas por <b>Buk<span style="color:var(--green)">é</span>ame</b><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></div>
+<div class="awning"></div>
+<div class="wrap">
+
+  <div class="view on" id="vLoading"><p class="sub">Cargando…</p></div>
+
+  <!-- Oferta abierta -->
+  <div class="view" id="vOffer">
+    <h1>Se liberó un turno</h1>
+    <p class="sub">Estabas en la lista de espera. Si lo quieres, tómalo antes de que pase al siguiente.</p>
+    <div class="card">
+      <div class="bizname" id="oBiz"></div>
+      <div style="text-align:center;margin-bottom:14px"><span class="badge">Turno disponible</span></div>
+      <div class="detail">
+        <div class="row"><span>Servicio</span><b id="oService"></b></div>
+        <div class="row" id="oStaffRow"><span>Profesional</span><b id="oStaff"></b></div>
+        <div class="row"><span>Fecha</span><b id="oDate"></b></div>
+        <div class="row"><span>Hora</span><b id="oTime"></b></div>
+      </div>
+    </div>
+    <div class="timer" id="oTimer"></div>
+    <div class="note warn" id="oDeposit" style="display:none"></div>
+    <div class="note" id="oHeld" style="display:none"></div>
+    <div class="alert" id="oAlert"></div>
+    <button class="btn btn-teal" id="takeBtn">Quiero este turno</button>
+  </div>
+
+  <!-- Tomado -->
+  <div class="view" id="vDone">
+    <h1>¡Es tuyo!</h1>
+    <p class="sub" id="dSub">Tu cita quedó confirmada. Te llega la confirmación por WhatsApp.</p>
+    <div class="card">
+      <div class="bizname" id="dBiz"></div>
+      <div class="detail">
+        <div class="row"><span>Servicio</span><b id="dService"></b></div>
+        <div class="row"><span>Fecha</span><b id="dDate"></b></div>
+        <div class="row"><span>Hora</span><b id="dTime"></b></div>
+      </div>
+    </div>
+    <p class="sub" style="margin-bottom:6px">Tu código de confirmación</p>
+    <div class="code" id="dCode"></div>
+    <div class="note warn" id="dDeposit" style="display:none"></div>
+    <div class="note" id="dHeld" style="display:none">Tu cita anterior sigue activa. Si ya no la necesitas, cancélala desde el enlace que te llegó cuando la reservaste.</div>
+    <a class="btn btn-teal" id="dCita" href="cita.html">Ver mi cita</a>
+  </div>
+
+  <!-- Vencida / usada -->
+  <div class="view" id="vGone">
+    <h1 id="gTitle">Esta oferta ya venció</h1>
+    <p class="sub" id="gSub">El turno pasó al siguiente de la lista. Sigues en la lista de espera: si se libera otro, te avisamos por WhatsApp.</p>
+    <a class="btn btn-teal" id="gBook" href="buscar.html">Reservar otra fecha</a>
+    <a class="btn btn-dark" id="gCita" href="cita.html" style="display:none">Ver mi cita</a>
+  </div>
+
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+const API = '/api';
+const TZ = 'America/Puerto_Rico';
+const offerId = new URLSearchParams(location.search).get('id') || '';
+let offer = null, timerId = null;
+
+function money(c){ return '$'+((c||0)/100).toFixed(2); }
+function fmtDate(iso){ return new Date(iso).toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long',timeZone:TZ}); }
+function fmtTime(iso){ return new Date(iso).toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit',timeZone:TZ}); }
+function show(id){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById(id).classList.add('on'); window.scrollTo({top:0}); }
+function bookHref(slug){ return slug ? 'negocio.html?slug='+encodeURIComponent(slug) : 'buscar.html'; }
+
+function gone(o, title, sub){
+  if(title) document.getElementById('gTitle').textContent = title;
+  if(sub) document.getElementById('gSub').textContent = sub;
+  document.getElementById('gBook').href = bookHref(o && o.slug);
+  if(o && o.confirmation_code){
+    // ya es suyo: lo principal es ver su cita, no reservar otra
+    const c = document.getElementById('gCita');
+    c.href = 'cita.html?code='+encodeURIComponent(o.confirmation_code);
+    c.className = 'btn btn-teal'; c.style.display = 'flex';
+    document.getElementById('gBook').style.display = 'none';
+  }
+  show('vGone');
+}
+
+function tick(){
+  if(!offer || !offer.expires_at) return;
+  const left = new Date(offer.expires_at).getTime() - Date.now();
+  if(left <= 0){ clearInterval(timerId); gone(offer); return; }
+  const m = Math.floor(left/60000), s = Math.floor((left%60000)/1000);
+  document.getElementById('oTimer').innerHTML = 'Te quedan <b>'+m+':'+String(s).padStart(2,'0')+'</b> para tomarlo';
+}
+
+async function load(){
+  if(!/^[0-9a-f-]{36}$/i.test(offerId)){ gone(null, 'Enlace no válido', 'Abre el enlace completo que te llegó por WhatsApp.'); return; }
+  try{
+    const r = await fetch(API+'/public/waitlist-offers/'+encodeURIComponent(offerId));
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok){ gone(null, 'No encontramos esta oferta', data.error || 'Abre el enlace completo que te llegó por WhatsApp.'); return; }
+    offer = data.offer;
+  }catch(e){ gone(null, 'Sin conexión', 'Revisa tu internet y vuelve a abrir el enlace.'); return; }
+
+  if(offer.state === 'accepted'){
+    gone(offer, 'Ya tomaste este turno', 'Este turno ya es tuyo. Puedes ver los detalles de tu cita.');
+    return;
+  }
+  if(offer.state === 'removed'){
+    gone(offer, 'Esta oferta ya no está disponible', 'Ya no estás en la lista de espera de este negocio. Si quieres, puedes reservar otra fecha.');
+    return;
+  }
+  if(offer.state !== 'offered'){ gone(offer); return; }
+
+  document.getElementById('oBiz').textContent = offer.business_name || '';
+  document.getElementById('oService').textContent = offer.service_name || '';
+  if(offer.staff_name) document.getElementById('oStaff').textContent = offer.staff_name;
+  else document.getElementById('oStaffRow').style.display = 'none';
+  document.getElementById('oDate').textContent = fmtDate(offer.starts_at);
+  document.getElementById('oTime').textContent = fmtTime(offer.starts_at);
+  if(offer.deposit_cents > 0){
+    const d = document.getElementById('oDeposit');
+    d.textContent = 'Este turno pide un depósito de '+money(offer.deposit_cents)+'. Al tomarlo tienes 30 minutos para pagarlo; si no, el turno se libera.';
+    d.style.display = 'block';
+  }
+  if(offer.held){
+    const h = document.getElementById('oHeld');
+    const when = fmtDate(offer.held.starts_at)+', '+fmtTime(offer.held.starts_at);
+    h.textContent = offer.held.will_cancel
+      ? 'Al tomarlo, tu cita del '+when+' se cancela sola y queda libre para otra persona.'
+      : 'Tu cita del '+when+' no se toca. Si ya no la necesitas, cancélala después.';
+    h.style.display = 'block';
+  }
+  show('vOffer');
+  tick(); timerId = setInterval(tick, 1000);
+}
+
+document.getElementById('takeBtn').onclick = async function(){
+  const btn = this, al = document.getElementById('oAlert');
+  al.className = 'alert';
+  btn.disabled = true; btn.textContent = 'Reservando…';
+  try{
+    const r = await fetch(API+'/public/waitlist-offers/'+encodeURIComponent(offerId)+'/accept', { method:'POST' });
+    const data = await r.json().catch(()=>({}));
+    if(r.status === 409){ clearInterval(timerId); gone(offer, 'Ese turno ya no está disponible', data.error); return; }
+    if(!r.ok){ al.textContent = data.error || 'No se pudo reservar. Intenta de nuevo.'; al.className = 'alert err'; btn.disabled = false; btn.textContent = 'Quiero este turno'; return; }
+    clearInterval(timerId);
+    const a = data.appointment || {};
+    document.getElementById('dBiz').textContent = offer.business_name || '';
+    document.getElementById('dService').textContent = a.service_name || '';
+    document.getElementById('dDate').textContent = fmtDate(a.starts_at);
+    document.getElementById('dTime').textContent = fmtTime(a.starts_at);
+    document.getElementById('dCode').textContent = a.confirmation_code || '';
+    document.getElementById('dCita').href = 'cita.html?code='+encodeURIComponent(a.confirmation_code || '');
+    if(a.status === 'pending_deposit'){
+      document.getElementById('dSub').textContent = 'Tu turno quedó reservado. Falta el depósito para confirmarlo.';
+      const d = document.getElementById('dDeposit');
+      d.textContent = 'Paga el depósito de '+money(a.deposit_cents)+' en los próximos 30 minutos con el botón de abajo. Si no, el turno se libera.';
+      d.style.display = 'block';
+      document.getElementById('dCita').textContent = 'Pagar el depósito';
+    }
+    if(data.held_kept) document.getElementById('dHeld').style.display = 'block';
+    show('vDone');
+  }catch(e){
+    al.textContent = 'Error de conexión. Intenta de nuevo.'; al.className = 'alert err';
+    btn.disabled = false; btn.textContent = 'Quiero este turno';
+  }
+};
+
+load();
+</script>
+<script src="i18n.js" defer></script>
+</body>
+</html>

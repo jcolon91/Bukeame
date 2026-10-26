@@ -12,7 +12,8 @@ const crypto = require('crypto');
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
-  const { asyncH, bad, isStr, isUuid, isDate, normPhone, isPhone, audit, notify, confirmCode, bookingLimiter } = h;
+  const { asyncH, bad, isStr, isUuid, isDate, normPhone, isPhone, audit, notify, confirmCode, bookingLimiter,
+          codeLimiter, enqueueApptConfirm, alertOwner, fmtPR, oneLine, citaUrl } = h;
 
   const ALIVE = ['pending_deposit', 'confirmed'];
 
@@ -225,9 +226,163 @@ module.exports.mount = function (app, ctx) {
 
   app.delete('/api/waitlist/:id', authRequired, businessScope, asyncH(async (req, res) => {
     if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
-    await db.query(`UPDATE waitlist SET status = 'expired'
+    // Si tenía una oferta abierta, se cierra: quien salió de la lista ya no la puede tomar.
+    await db.query(`UPDATE waitlist SET status = 'expired',
+                           offer_state = CASE WHEN offer_state = 'offered' THEN 'declined'::waitlist_offer_st ELSE offer_state END
                      WHERE id = $1 AND business_id = $2`, [req.params.id, req.business.id]);
     res.json({ ok: true });
+  }));
+
+  // ==========================================================================
+  //  OFERTA DE LA LISTA DE ESPERA — la toma el cliente desde oferta.html?id=
+  // --------------------------------------------------------------------------
+  //  El enlace del WhatsApp lleva el id de su fila en waitlist (uuid aleatorio): solo
+  //  lo tienen el cliente y el negocio. Antes el mensaje decía "responde SÍ" y nadie
+  //  leía esas respuestas, así que ninguna oferta se podía aceptar.
+  // ==========================================================================
+  // El turno nuevo pide depósito si la cita liberada lo pedía. Si el cliente tenía una
+  // cita protegida con depósito PAGADO, ese depósito se muda al turno nuevo y la vieja
+  // se cancela. Si hay que pagar depósito nuevo, la vieja NO se toca (si no paga en 30
+  // min, perdería las dos); él la cancela si quiere.
+  async function offerView(id) {
+    const { rows } = await db.query(
+      `SELECT w.id, w.offer_state, w.status, w.offer_expires_at,
+              a.starts_at, a.service_name, a.deposit_cents, st.display_name AS staff_name,
+              b.name AS business_name, b.slug,
+              ha.id AS held_id, ha.starts_at AS held_starts_at, ha.service_name AS held_service,
+              (SELECT COALESCE(sum(p.amount_cents),0)::int FROM payments p
+                WHERE p.appointment_id = ha.id AND p.kind = 'deposit' AND p.status = 'paid') AS held_paid
+         FROM waitlist w
+         JOIN businesses b ON b.id = w.business_id
+         LEFT JOIN appointments a ON a.id = w.offered_appointment_id
+         LEFT JOIN staff st ON st.id = a.staff_id
+         LEFT JOIN appointments ha ON ha.id = w.held_appointment_id AND ha.status = ANY($2)
+        WHERE w.id = $1`, [id, ALIVE]);
+    return rows[0] || null;
+  }
+
+  app.get('/api/public/waitlist-offers/:id', codeLimiter, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'Oferta no encontrada', 404);
+    const o = await offerView(req.params.id);
+    if (!o) return bad(res, 'Oferta no encontrada', 404);
+    const live = o.offer_state === 'offered' && o.status === 'waiting' && new Date(o.offer_expires_at) > new Date();
+    // expired = venció y sigue en la lista; removed = ya no está en la lista (lo sacaron
+    // o el negocio le asignó otro turno a mano).
+    const out = {
+      state: live ? 'offered'
+        : o.offer_state === 'accepted' ? 'accepted'
+        : o.status === 'waiting' ? 'expired' : 'removed',
+      business_name: o.business_name, slug: o.slug,
+      starts_at: o.starts_at, service_name: o.service_name, staff_name: o.staff_name,
+      expires_at: live ? o.offer_expires_at : null,
+    };
+    if (out.state === 'accepted') {
+      // tras aceptar, offered_appointment_id apunta al turno nuevo
+      const a = await db.query(
+        `SELECT confirmation_code FROM appointments a JOIN waitlist w ON w.offered_appointment_id = a.id WHERE w.id = $1`,
+        [req.params.id]);
+      out.confirmation_code = a.rows[0]?.confirmation_code || null;
+    }
+    if (live) {
+      out.deposit_cents = o.held_paid > 0 ? 0 : (o.deposit_cents || 0);
+      if (o.held_id) out.held = {
+        starts_at: o.held_starts_at, service_name: o.held_service,
+        will_cancel: !(o.deposit_cents > 0) || o.held_paid > 0,
+      };
+    }
+    res.json({ offer: out });
+  }));
+
+  app.post('/api/public/waitlist-offers/:id/accept', codeLimiter, asyncH(async (req, res) => {
+    if (!isUuid(req.params.id)) return bad(res, 'Oferta no encontrada', 404);
+    const client = await db.connect();
+    let appt, w, slot, held = null, freedHeld = null;
+    try {
+      await client.query('BEGIN');
+      w = (await client.query(`SELECT * FROM waitlist WHERE id = $1 FOR UPDATE`, [req.params.id])).rows[0];
+      if (!w) { await client.query('ROLLBACK'); return bad(res, 'Oferta no encontrada', 404); }
+      if (w.status !== 'waiting' || w.offer_state !== 'offered' || !(new Date(w.offer_expires_at) > new Date())) {
+        await client.query('ROLLBACK');
+        return bad(res, w.status === 'waiting'
+          ? 'Esta oferta ya venció. Sigues en la lista de espera.'
+          : 'Esta oferta ya no está disponible.', 409);
+      }
+      slot = (await client.query(`SELECT * FROM appointments WHERE id = $1`, [w.offered_appointment_id])).rows[0];
+      const blocked = slot && (await client.query(
+        `SELECT 1 FROM time_blocks WHERE business_id = $1 AND (staff_id IS NULL OR staff_id = $2)
+            AND starts_at < $4 AND ends_at > $3 AND COALESCE(reason,'') <> '__OPEN_SLOT__' LIMIT 1`,
+        [slot.business_id, slot.staff_id, slot.starts_at, slot.ends_at])).rows[0];
+      if (!slot || blocked) {
+        await client.query(`UPDATE waitlist SET offer_state = 'expired' WHERE id = $1`, [w.id]);
+        await client.query('COMMIT');
+        return bad(res, 'Ese turno ya no está disponible. Sigues en la lista de espera.', 409);
+      }
+
+      held = w.held_appointment_id ? (await client.query(
+        `SELECT a.id, (SELECT COALESCE(sum(p.amount_cents),0)::int FROM payments p
+                        WHERE p.appointment_id = a.id AND p.kind = 'deposit' AND p.status = 'paid') AS paid
+           FROM appointments a WHERE a.id = $1 AND a.status = ANY($2) FOR UPDATE`,
+        [w.held_appointment_id, ALIVE])).rows[0] : null;
+      const needDeposit = (slot.deposit_cents || 0) > 0 && !(held && held.paid > 0);
+      const depositCents = held && held.paid > 0 ? held.paid : (needDeposit ? slot.deposit_cents : 0);
+
+      await client.query('SAVEPOINT ins');
+      try {
+        appt = (await client.query(
+          `INSERT INTO appointments (business_id, client_id, staff_id, service_id, service_name, service_ids,
+              duration_min, price_cents, deposit_cents, starts_at, ends_at, status, source, confirmation_code)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'online',$13) RETURNING *`,
+          [w.business_id, w.client_id, slot.staff_id, slot.service_id, slot.service_name,
+           JSON.stringify(slot.service_ids || []), slot.duration_min, slot.price_cents, depositCents,
+           slot.starts_at, slot.ends_at, needDeposit ? 'pending_deposit' : 'confirmed',
+           confirmCode('ESP', slot.starts_at)])).rows[0];
+      } catch (e) {
+        if (e.code !== '23P01') throw e;
+        await client.query('ROLLBACK TO SAVEPOINT ins');
+        await client.query(`UPDATE waitlist SET offer_state = 'expired' WHERE id = $1`, [w.id]);
+        await client.query('COMMIT');
+        return bad(res, 'Ese turno ya lo tomó otra persona. Sigues en la lista de espera.', 409);
+      }
+
+      if (needDeposit)
+        await client.query(
+          `INSERT INTO payments (business_id, appointment_id, client_id, kind, method, amount_cents)
+           VALUES ($1,$2,$3,'deposit','ath_movil',$4)`, [w.business_id, appt.id, w.client_id, depositCents]);
+      if (held && !needDeposit) {
+        // el depósito ya pagado se muda al turno nuevo; la cita vieja queda libre
+        await client.query(
+          `UPDATE payments SET appointment_id = $2
+            WHERE appointment_id = $1 AND kind = 'deposit' AND status = 'paid'`, [held.id, appt.id]);
+        freedHeld = (await client.query(
+          `UPDATE appointments SET status = 'cancelled_client', cancelled_at = now(),
+                  cancel_reason = 'Tomó un turno de la lista de espera'
+            WHERE id = $1 RETURNING starts_at`, [held.id])).rows[0];
+      }
+      await client.query(
+        `UPDATE waitlist SET status = 'booked', offer_state = 'accepted', offered_appointment_id = $2 WHERE id = $1`,
+        [w.id, appt.id]);
+      await client.query('COMMIT');
+    } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; }
+    finally { client.release(); }
+
+    // Después del COMMIT: el cliente recibe su confirmación (o el enlace para pagar el
+    // depósito) y el dueño se entera por in-app + WhatsApp/email.
+    await enqueueApptConfirm(w.business_id, appt.id);
+    const who = (await db.query(`SELECT full_name FROM clients WHERE id = $1`, [w.client_id])).rows[0]?.full_name || 'Un cliente';
+    const detail = oneLine(`${who} tomó ${appt.service_name} · ${fmtPR(appt.starts_at)}`
+      + (appt.status === 'pending_deposit' ? ' · pendiente de depósito' : '')
+      + (freedHeld ? ` · soltó su cita del ${fmtPR(freedHeld.starts_at)}` : '')).slice(0, 200);
+    await alertOwner(w.business_id, appt.id, {
+      type: 'waitlist', title: 'Turno tomado de la lista de espera', body: detail, template: 'owner_waitlist',
+      wa: `*Bukéame* — Turno tomado de la lista de espera\n\n${detail}\n\nMíralo en tu panel de Bukéame: Agenda.`,
+    });
+    res.status(201).json({
+      ok: true,
+      appointment: { confirmation_code: appt.confirmation_code, status: appt.status, starts_at: appt.starts_at,
+                     service_name: appt.service_name, deposit_cents: appt.deposit_cents },
+      cita_url: citaUrl(appt.confirmation_code),
+      held_kept: !!held && !freedHeld,
+    });
   }));
 
   // ==========================================================================
@@ -340,56 +495,88 @@ module.exports.startWorkers = function (ctx) {
   const { db } = ctx;
   const ALIVE = ['pending_deposit', 'confirmed'];
 
-  // -- (1) Expirar ofertas vencidas y pasar al siguiente en lista --------------
-  async function rotateOffers() {
-    // ofertas que pasaron de 30 min sin aceptar → expiran, NO tocan la cita base
-    const expired = await db.query(
-      `UPDATE waitlist SET offer_state = 'expired', offered_appointment_id = NULL
-        WHERE offer_state = 'offered' AND offer_expires_at < now()
-        RETURNING id, business_id, offered_appointment_id`);
-    // (el cliente conserva su held_appointment_id intacto — no se cancela nada)
+  // Ofrece UN cupo liberado (la cita cancelada: mismo profesional, servicio y hora) al
+  // primero de la fila que le sirva. Solo si es a futuro con tiempo para tomarlo, si
+  // sigue libre (sin cita viva ni bloqueo del negocio encima), el profesional sigue
+  // activo y el plan incluye lista de espera. No se le ofrece a quien lo canceló, a
+  // quien ya tiene otra oferta abierta, ni a quien ya se le ofreció este mismo cupo.
+  async function offerSlot(slot) {
+    const startMs = new Date(slot.starts_at).getTime();
+    if (startMs < Date.now() + 45 * 60_000) return;
+    const ok = await db.query(
+      `SELECT
+         EXISTS (SELECT 1 FROM businesses b JOIN subscriptions s ON s.business_id = b.id
+                   JOIN plans p ON p.code = s.plan_code
+                  WHERE b.id = $1 AND b.deleted_at IS NULL AND (p.features->>'waitlist')::boolean = true)
+         AND EXISTS (SELECT 1 FROM staff WHERE id = $2 AND is_active)
+         AND NOT EXISTS (SELECT 1 FROM appointments x WHERE x.staff_id = $2 AND x.status = ANY($5)
+                           AND x.starts_at < $4 AND x.ends_at > $3)
+         AND NOT EXISTS (SELECT 1 FROM time_blocks tb WHERE tb.business_id = $1
+                           AND (tb.staff_id IS NULL OR tb.staff_id = $2)
+                           AND tb.starts_at < $4 AND tb.ends_at > $3
+                           AND COALESCE(tb.reason,'') <> '__OPEN_SLOT__') AS ok`,
+      [slot.business_id, slot.staff_id, slot.starts_at, slot.ends_at, ALIVE]);
+    if (!ok.rows[0].ok) return;
 
-    // Para cada cupo que quedó libre otra vez, ofrecer al siguiente en fila.
-    // (En esta versión, el cupo liberado se re-detecta por el flujo de cancelación.)
+    const slotDate = new Date(slot.starts_at).toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+    const cand = await db.query(
+      `SELECT w.id, c.phone
+         FROM waitlist w JOIN clients c ON c.id = w.client_id
+        WHERE w.business_id = $1 AND w.status = 'waiting' AND w.offer_state <> 'offered'
+          AND $2::date BETWEEN w.date_from AND w.date_to
+          AND (w.service_id IS NULL OR w.service_id = $3)
+          AND (w.staff_id IS NULL OR w.staff_id = $4)
+          AND w.offered_appointment_id IS DISTINCT FROM $5
+          AND w.client_id <> $6
+          AND c.is_blocked = false
+          AND NOT EXISTS (SELECT 1 FROM waitlist w2 WHERE w2.business_id = w.business_id
+                            AND w2.client_id = w.client_id AND w2.offer_state = 'offered')
+        ORDER BY w.position LIMIT 1`,
+      [slot.business_id, slotDate, slot.service_id, slot.staff_id, slot.id, slot.client_id]);
+    const w = cand.rows[0];
+    if (!w) return;
+    // 30 min para tomarlo, sin pasarse de 15 min antes de la cita.
+    const expires = new Date(Math.min(Date.now() + 30 * 60_000, startMs - 15 * 60_000));
+    const upd = await db.query(
+      `UPDATE waitlist SET offer_state = 'offered', offered_appointment_id = $2,
+              offered_at = now(), offer_expires_at = $3
+        WHERE id = $1 AND offer_state <> 'offered'`, [w.id, slot.id, expires]);
+    if (!upd.rowCount) return;
+    // El WhatsApp lleva el enlace oferta.html?id=<waitlist.id> (lo arma dispatchMessages).
+    await db.query(
+      `INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
+       VALUES ($1,$2,'whatsapp',$3,'waitlist_offer')`, [slot.business_id, slot.id, w.phone]);
+  }
+
+  const SLOT_COLS = `a.id, a.business_id, a.staff_id, a.service_id, a.client_id, a.starts_at, a.ends_at`;
+
+  // -- (1) Ofertas vencidas → pasan al siguiente de la fila ----------------------
+  async function rotateOffers() {
+    // offered_appointment_id se CONSERVA: así a esa persona no se le repite el mismo cupo.
+    // Sigue en la lista ('waiting') para los próximos cupos; su cita base no se toca.
+    const expired = await db.query(
+      `UPDATE waitlist SET offer_state = 'expired'
+        WHERE offer_state = 'offered' AND offer_expires_at < now()
+        RETURNING offered_appointment_id`);
+    const ids = [...new Set(expired.rows.map(r => r.offered_appointment_id).filter(Boolean))];
+    for (const id of ids) {
+      const s = await db.query(
+        `SELECT ${SLOT_COLS} FROM appointments a
+          WHERE a.id = $1 AND a.status IN ('cancelled_client','cancelled_business')`, [id]);
+      if (s.rows[0]) await offerSlot(s.rows[0]);
+    }
   }
 
   // -- (2) Cuando se cancela una cita, ofrecer el cupo al primero compatible -----
-  //    Esto se dispara por trigger lógico: revisamos citas recién canceladas.
+  //    Revisamos citas recién canceladas que todavía no se le ofrecieron a nadie.
   async function offerFreedSlots() {
-    // buscar cancelaciones recientes sin oferta hecha aún
     const freed = await db.query(
-      `SELECT a.id, a.business_id, a.staff_id, a.service_id, a.starts_at, a.ends_at
-         FROM appointments a
+      `SELECT ${SLOT_COLS} FROM appointments a
         WHERE a.status IN ('cancelled_client','cancelled_business')
-          AND a.cancelled_at > now() - interval '5 minutes'`);
-
-    for (const slot of freed.rows) {
-      const slotDate = new Date(slot.starts_at).toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
-      // primer cliente en lista compatible (fecha en rango, servicio/staff si especificó),
-      // que NO tenga ya una oferta activa
-      const cand = await db.query(
-        `SELECT w.id, w.client_id, c.phone, c.full_name
-           FROM waitlist w JOIN clients c ON c.id = w.client_id
-          WHERE w.business_id = $1 AND w.status = 'waiting' AND w.offer_state = 'none'
-            AND $2::date BETWEEN w.date_from AND w.date_to
-            AND (w.service_id IS NULL OR w.service_id = $3)
-            AND (w.staff_id IS NULL OR w.staff_id = $4)
-          ORDER BY w.position LIMIT 1`,
-        [slot.business_id, slotDate, slot.service_id, slot.staff_id]);
-
-      if (cand.rows[0]) {
-        const w = cand.rows[0];
-        const expires = new Date(Date.now() + 30 * 60_000); // 30 min para confirmar
-        await db.query(
-          `UPDATE waitlist SET offer_state = 'offered',
-               offered_appointment_id = $2, offer_expires_at = $3
-            WHERE id = $1`, [w.id, slot.id, expires]);
-        // avisar por WhatsApp (queue) — el cliente confirma vía link
-        await db.query(
-          `INSERT INTO message_log (business_id, channel, recipient, template)
-           VALUES ($1,'whatsapp',$2,'waitlist_offer')`, [slot.business_id, w.phone]);
-      }
-    }
+          AND a.cancelled_at > now() - interval '5 minutes'
+          AND a.starts_at > now()
+          AND NOT EXISTS (SELECT 1 FROM waitlist w WHERE w.offered_appointment_id = a.id)`);
+    for (const slot of freed.rows) await offerSlot(slot);
   }
 
   // -- (3) Recordatorio "te toca" a clientes inactivos --------------------------
@@ -411,8 +598,15 @@ module.exports.startWorkers = function (ctx) {
          VALUES ($1,'whatsapp',$2,'due_reminder')`, [r.business_id, r.phone]);
   }
 
-  setInterval(() => { offerFreedSlots().catch(e => console.error('offers:', e.message)); }, 30_000);
-  setInterval(() => { rotateOffers().catch(e => console.error('rotate:', e.message)); }, 60_000);
+  // Las dos tareas de ofertas nunca corren a la vez (así un cupo no se ofrece doble).
+  let offering = false;
+  const oneAtATime = (fn) => async () => {
+    if (offering) return;
+    offering = true;
+    try { await fn(); } finally { offering = false; }
+  };
+  setInterval(() => { oneAtATime(offerFreedSlots)().catch(e => console.error('offers:', e.message)); }, 30_000);
+  setInterval(() => { oneAtATime(rotateOffers)().catch(e => console.error('rotate:', e.message)); }, 60_000);
   setInterval(() => { dueReminders().catch(e => console.error('due:', e.message)); }, 3600_000); // cada hora
 
   console.log('  ✓ workers de fidelización activos (ofertas 30min, te-toca)');

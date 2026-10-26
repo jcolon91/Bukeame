@@ -364,6 +364,15 @@ async function notify(businessId, type, title, body, data = {}) {
   await db.query(
     `INSERT INTO notifications (business_id, type, title, body, data)
      VALUES ($1,$2,$3,$4,$5)`, [businessId, type, title, body, data]);
+  pushToBusiness(businessId, title, body);
+}
+// Cada aviso in-app del negocio también sale como push al dueño (si activó "Activar
+// avisos" en el panel). Fire-and-forget: nunca frena ni rompe el flujo que lo generó.
+function pushToBusiness(businessId, title, body) {
+  if (!pushReady()) return;
+  db.query(`SELECT owner_user_id FROM businesses WHERE id = $1`, [businessId])
+    .then(r => r.rows[0] && sendPush(r.rows[0].owner_user_id, title, body, '/panel.html'))
+    .catch(e => console.error('push negocio:', e.message));
 }
 // In-app dirigida a un USUARIO (p.ej. un empleado). La tabla notifications admite user_id;
 // el empleado las ve vía GET /api/me/notifications. Falla suave (no rompe el flujo).
@@ -373,6 +382,7 @@ async function notifyUser(userId, type, title, body, data = {}) {
     await db.query(`INSERT INTO notifications (user_id, type, title, body, data) VALUES ($1,$2,$3,$4,$5)`,
       [userId, type, title, body, data]);
   } catch (e) { console.error('notifyUser:', e.message); }
+  if (pushReady()) sendPush(userId, title, body, '/cliente.html').catch(e => console.error('push usuario:', e.message));
 }
 
 // ----------------------------------------------------------------------------
@@ -2078,6 +2088,44 @@ app.get('/api/public/discover', publicLimiter, publicCache, asyncH(async (req, r
   res.json({ featured, nearby, top_rated, recent, promoted });
 }));
 
+// Métodos de pago que el negocio activó (resiliente si la migración 07/11 aún no corre).
+// Traemos también account_ref + config para armar lo PÚBLICO del checkout.
+function loadPayProviders(businessId) {
+  return db.query(`SELECT provider, account_ref, COALESCE(config, '{}'::jsonb) AS config
+                     FROM payment_providers
+                    WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [businessId])
+    .catch(() => db.query(`SELECT provider, account_ref FROM payment_providers
+                    WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [businessId])
+      .catch(() => ({ rows: [] })));
+}
+// Datos PÚBLICOS para cobrar (solo métodos activos + conectados). El public_token
+// de ATH es público por diseño (va en el botón client-side); es seguro exponerlo.
+// NUNCA hay secretos aquí (ni privateToken de ATH, ni llaves de Stripe).
+// Lo usan el perfil del negocio y la página de la cita (para pagar el depósito).
+function buildPaymentConfig(rows) {
+  const byProv = {};
+  for (const r of rows) byProv[r.provider] = r;
+  const athRow = byProv['ath_movil'];            // ATH manual (el negocio valida)
+  const athBiz = byProv['ath_movil_business'];   // ATH Negocios (automático por API)
+  const ppRow  = byProv['paypal'];
+  const stRow  = byProv['stripe'];
+  return {
+    // ATH manual: el cliente paga al número y el negocio valida (como cash).
+    ath_manual: athRow ? { phone: athRow.account_ref || null } : null,
+    // ATH Negocios: automático por API. NO se expone el token (vive en el servidor).
+    ath_business: athBiz ? { enabled: true } : null,
+    paypal: ppRow ? {
+      handle: (ppRow.config && ppRow.config.paypal_handle) || ppRow.account_ref || null,
+    } : null,
+    stripe: stRow ? {
+      payment_link: (stRow.config && stRow.config.stripe_payment_link) || null,
+      connected: !!(stRow.config && (stRow.config.stripe_payment_link || stRow.config.stripe_account_id)),
+    } : { connected: false },
+    // Efectivo: el cliente paga en persona; el negocio valida y acepta la cita.
+    cash: byProv['cash'] ? { enabled: true } : null,
+  };
+}
+
 // Perfil público (la página SEO bukeame.com/<slug>)
 app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
@@ -2108,14 +2156,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     db.query(`SELECT r.id, r.rating, r.comment, r.business_reply, r.created_at, c.full_name
               FROM reviews r JOIN clients c ON c.id = r.client_id
               WHERE r.business_id = $1 AND r.is_published ORDER BY r.created_at DESC LIMIT 10`, [biz.id]),
-    // Métodos de pago que el negocio activó (resiliente si la migración 07/11 aún no corre).
-    // Traemos también account_ref + config para armar lo PÚBLICO del checkout.
-    db.query(`SELECT provider, account_ref, COALESCE(config, '{}'::jsonb) AS config
-                FROM payment_providers
-               WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [biz.id])
-      .catch(() => db.query(`SELECT provider, account_ref FROM payment_providers
-               WHERE business_id = $1 AND is_enabled = true AND status = 'connected'`, [biz.id])
-        .catch(() => ({ rows: [] }))),
+    loadPayProviders(biz.id),
     // Productos activos del negocio con sus fotos + reseñas resumidas (resiliente si
     // las tablas aún no existen). first_photo = la 1ra por sort_order para la tarjeta;
     // rating_avg (1 decimal) / rating_count salen de product_reviews (migración 12).
@@ -2165,30 +2206,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
           .catch(() => ({ rows: [] }))
       : Promise.resolve({ rows: [] }),
   ]);
-  // Datos PÚBLICOS para cobrar (solo métodos activos + conectados). El public_token
-  // de ATH es público por diseño (va en el botón client-side); es seguro exponerlo.
-  // NUNCA hay secretos aquí (ni privateToken de ATH, ni llaves de Stripe).
-  const byProv = {};
-  for (const r of payMethods.rows) byProv[r.provider] = r;
-  const athRow = byProv['ath_movil'];            // ATH manual (el negocio valida)
-  const athBiz = byProv['ath_movil_business'];   // ATH Negocios (automático por API)
-  const ppRow  = byProv['paypal'];
-  const stRow  = byProv['stripe'];
-  const payment_config = {
-    // ATH manual: el cliente paga al número y el negocio valida (como cash).
-    ath_manual: athRow ? { phone: athRow.account_ref || null } : null,
-    // ATH Negocios: automático por API. NO se expone el token (vive en el servidor).
-    ath_business: athBiz ? { enabled: true } : null,
-    paypal: ppRow ? {
-      handle: (ppRow.config && ppRow.config.paypal_handle) || ppRow.account_ref || null,
-    } : null,
-    stripe: stRow ? {
-      payment_link: (stRow.config && stRow.config.stripe_payment_link) || null,
-      connected: !!(stRow.config && (stRow.config.stripe_payment_link || stRow.config.stripe_account_id)),
-    } : { connected: false },
-    // Efectivo: el cliente paga en persona; el negocio valida y acepta la cita.
-    cash: byProv['cash'] ? { enabled: true } : null,
-  };
+  const payment_config = buildPaymentConfig(payMethods.rows);
   delete biz.branding_ok;   // uso interno (galería); no se expone
   res.json({
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
@@ -2505,6 +2523,10 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
       try { await adsMod.recordConversion(db, ad_campaign_id, appt.id, appt.business_id); } catch (_e) {}
     }
 
+    // Esta consulta se perdió el 29-jun al cambiar el aviso al dueño: sin ella, CADA
+    // reserva se guardaba pero respondía 500 ("st is not defined") y el cliente veía
+    // "Error interno" aunque su cita ya existía.
+    const st = await db.query(`SELECT display_name FROM staff WHERE id = $1`, [appt.staff_id]);
     res.status(201).json({
       appointment: {
         confirmation_code: appt.confirmation_code,
@@ -2526,7 +2548,7 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
 app.get('/api/public/appointments/:code', codeLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
     `SELECT a.confirmation_code, a.status, a.starts_at, a.service_name, a.price_cents, a.deposit_cents,
-            st.display_name AS staff_name,
+            st.display_name AS staff_name, a.business_id,
             b.name AS business_name, b.slug, b.address_line, b.cancellation_hours, b.ath_phone,
             (SELECT json_build_object('method', p.method, 'status', p.status, 'amount_cents', p.amount_cents)
                FROM payments p WHERE p.appointment_id = a.id AND p.kind = 'deposit' LIMIT 1) AS deposit
@@ -2534,8 +2556,17 @@ app.get('/api/public/appointments/:code', codeLimiter, asyncH(async (req, res) =
        JOIN businesses b ON b.id = a.business_id
        JOIN staff st ON st.id = a.staff_id
       WHERE a.confirmation_code = $1`, [req.params.code.toUpperCase()]);
-  if (!rows[0]) return bad(res, 'Cita no encontrada', 404);
-  res.json({ appointment: rows[0] });
+  const appt = rows[0];
+  if (!appt) return bad(res, 'Cita no encontrada', 404);
+  // cita.html arma los botones para pagar el depósito con esto. Antes no venía y la
+  // tarjeta "Asegura tu cita" nunca aparecía (no había cómo pagar desde el enlace).
+  if (appt.status === 'pending_deposit') {
+    appt.payment_config = buildPaymentConfig((await loadPayProviders(appt.business_id)).rows);
+    // Sin ATH conectado en Pagos, vale el número ATH del perfil (el mismo que da la reserva).
+    if (!appt.payment_config.ath_manual && appt.ath_phone) appt.payment_config.ath_manual = { phone: appt.ath_phone };
+  }
+  delete appt.business_id;
+  res.json({ appointment: appt });
 }));
 
 // Cliente reporta su referencia ATH Móvil → el negocio verifica
@@ -2582,8 +2613,8 @@ app.post('/api/public/appointments/:code/cancel', codeLimiter, asyncH(async (req
   await db.query(
     `UPDATE appointments SET status = 'cancelled_client', cancelled_at = now(),
             cancel_reason = $2 WHERE id = $1`, [a.id, (req.body?.reason || '').slice(0, 200) || null]);
-  await notify(a.business_id, 'cancellation', '❌ Cita cancelada',
-    `${a.full_name} canceló ${a.service_name}`, { appointment_id: a.id });
+  await alertClientCancel(a.business_id, a.id,
+    `${a.full_name} canceló ${a.service_name} · ${fmtPR(a.starts_at)}`);
   res.json({ ok: true });
 }));
 
@@ -2722,9 +2753,13 @@ app.post('/api/public/:slug/appointments/:code/ath/poll', codeLimiter, asyncH(as
     // re-activamos; avisamos al negocio para reubicar o reembolsar al cliente.
     await notify(pend.businessId, 'payment', '⚠️ Pago de reserva expirada',
       `Ref ${ref} · ${pend.serviceName} · el depósito entró pero la cita ya no estaba activa; contacta al cliente`, { appointment_id: pend.appointmentId });
-  else
+  else {
     await notify(pend.businessId, 'payment', 'Pago ATH Móvil recibido',
       `Ref ${ref} · ${pend.serviceName}`, { appointment_id: pend.appointmentId });
+    // El cliente tenía el WhatsApp de "pendiente, se libera en 30 min": ahora le llega
+    // "confirmada". Sin email: el recibo de abajo ya se lo confirma por correo.
+    await enqueueApptConfirm(pend.businessId, pend.appointmentId, { email: false });
+  }
   // Recibo (factura del negocio) por email al cliente. Fire-and-forget; nunca rompe el pago.
   try {
     const rc = await db.query(
@@ -3092,10 +3127,14 @@ try {
       process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
 } catch (e) { /* 'web-push' aún no instalado → push inerte */ }
 
+function pushReady() {
+  return !!(webpush && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+}
+
 // Envía push a TODAS las suscripciones de un usuario. Best-effort; limpia las muertas.
-// No-op si push no está configurado. Listo para llamar desde cualquier evento.
+// No-op si push no está configurado. Lo llaman notify() y notifyUser().
 async function sendPush(userId, title, body, url) {
-  if (!webpush || !process.env.VAPID_PUBLIC_KEY) return;
+  if (!userId || !pushReady()) return;
   let subs;
   try { subs = (await db.query(`SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1`, [userId])).rows; }
   catch (e) { return; }
@@ -3209,17 +3248,23 @@ app.patch('/api/appointments/:id', authRequired, businessScope, asyncH(async (re
   if (!appt) return bad(res, 'Cita no encontrada', 404);
 
   const { status, start_iso } = req.body || {};
+  // Avisos al cliente que salen al final (si todo lo de abajo se guardó).
+  const clientMsgs = [];
 
   if (start_iso) {   // reagendar
     const starts = new Date(start_iso);
     if (isNaN(starts)) return bad(res, 'Horario inválido');
+    const moved = starts.getTime() !== new Date(appt.starts_at).getTime();
     try {
-      await db.query(`UPDATE appointments SET starts_at = $1, ends_at = $2 WHERE id = $3`,
+      // Si de verdad cambió la hora, los recordatorios se vuelven a armar para la nueva.
+      await db.query(`UPDATE appointments SET starts_at = $1, ends_at = $2
+                          ${moved ? ', reminder_24h_sent_at = NULL, reminder_2h_sent_at = NULL' : ''} WHERE id = $3`,
         [starts, new Date(starts.getTime() + appt.duration_min * 60_000), appt.id]);
     } catch (e) {
       if (e.code === '23P01') return bad(res, 'Choca con otra cita de ese profesional', 409);
       throw e;
     }
+    if (moved && ALIVE.includes(appt.status)) clientMsgs.push('rescheduled');
   }
 
   if (status) {
@@ -3253,8 +3298,19 @@ app.patch('/api/appointments/:id', authRequired, businessScope, asyncH(async (re
     }
     if (status === 'no_show')
       await db.query(`UPDATE clients SET no_show_count = no_show_count + 1 WHERE id = $1`, [appt.client_id]);
+    if (status === 'cancelled_business' && ALIVE.includes(appt.status)) {
+      clientMsgs.length = 0;   // cancelada: el aviso de "cambió de hora" ya no aplica
+      clientMsgs.push('cancelled_business');
+    }
   }
   await audit(req, 'appointment.update', 'appointment', appt.id, { status, rescheduled: !!start_iso });
+  // Aceptada a mano sin pasar por "Validar depósito": el cliente también se entera.
+  // (La confirmación ya lleva la hora nueva si además se movió: no va el "movieron".)
+  if (status === 'confirmed' && appt.status === 'pending_deposit') {
+    await enqueueApptConfirm(req.business.id, appt.id);
+    clientMsgs.length = 0;
+  }
+  for (const tpl of clientMsgs) await enqueueClientMsg(req.business.id, appt.id, tpl);
   res.json({ ok: true });
 }));
 
@@ -3438,9 +3494,25 @@ app.get('/api/subscription', authRequired, businessScope, asyncH(async (req, res
 const fmtPR = d => new Date(d).toLocaleString('es-PR',
   { timeZone: 'America/Puerto_Rico', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
 
+// Enlaces que van dentro de los avisos. Las respuestas por WhatsApp llegan al número
+// compartido de Bukéame (nadie las lee), así que los mensajes NUNCA dicen "responde
+// aquí": mandan al cliente a su cita o al WhatsApp del negocio.
+const SITE_URL = 'https://bukeame.com';
+const citaUrl = (code) => `${SITE_URL}/cita.html?code=${encodeURIComponent(code || '')}`;
+const bookUrl = (slug) => `${SITE_URL}/negocio.html?slug=${encodeURIComponent(slug || '')}`;
+// Solo el WhatsApp del negocio (no su teléfono: si es fijo, el wa.me no abre). Sin él,
+// los mensajes mandan al enlace de la cita.
+function bizWaLink(biz) {
+  const n = waNumber(biz?.whatsapp || '');
+  return n.length >= 11 ? `https://wa.me/${n}` : '';
+}
+
 function buildMessage(template, ctx) {
   const { biz, appt } = ctx;
   const when = appt?.starts_at ? fmtPR(appt.starts_at) : '';
+  const link = citaUrl(appt?.confirmation_code);
+  const waLink = bizWaLink(biz);
+  const contact = waLink ? `Si no puedes llegar, avísale al negocio: ${waLink}` : `Si no puedes llegar, cancela aquí: ${link}`;
   // Ubicación (dirección + enlace al mapa). SOLO va en el recordatorio de 2 horas
   // antes (cuando el cliente va saliendo) — no en la confirmación ni en los recordatorios
   // lejanos. Si el negocio no puso ubicación (lat/lng null), no aparece ningún pin.
@@ -3448,21 +3520,34 @@ function buildMessage(template, ctx) {
     + (biz.lat != null && biz.lng != null ? `🗺 Cómo llegar: https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}\n` : '');
   switch (template) {
     case 'confirm':
-      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n${appt.status === 'pending_deposit' && biz.ath_phone ? `\nPara confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${biz.ath_phone} y responde con tu referencia.` : ''}${appt.status === 'pending_deposit' ? `\n\n⏳ *Importante:* tu turno queda reservado por *30 minutos* mientras el negocio valida el depósito. Si no se valida a tiempo, el turno se libera.` : ''}`;
+      return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n`
+        + (appt.status === 'pending_deposit'
+          ? `\nPara confirmarla, paga el depósito de $${(appt.deposit_cents / 100).toFixed(2)} aquí:\n${link}\n`
+            + (biz.ath_phone ? `(o envíalo por ATH Móvil al ${biz.ath_phone} y pon la referencia en ese mismo enlace)\n` : '')
+            + `\n⏳ *Importante:* tu turno queda reservado por *30 minutos* mientras se valida el depósito. Si no se valida a tiempo, el turno se libera.`
+          : `\nVer o cancelar tu cita: ${link}`);
     case 'hold_expired':
-      return `⌛ *${biz.name}*\nTu reserva de *${appt.service_name}* (${when}) no quedó registrada: el depósito no se validó dentro de los 30 minutos y el turno se liberó.\n\nSi YA enviaste el depósito, contacta al negocio para que valide tu pago y te reubique. Si no, puedes reservar de nuevo cuando quieras. 🙏`;
+      return `⌛ *${biz.name}*\nTu reserva de *${appt.service_name}* (${when}) no quedó registrada: el depósito no se validó dentro de los 30 minutos y el turno se liberó.\n\nSi YA enviaste el depósito, contacta al negocio para que valide tu pago y te reubique${waLink ? `: ${waLink}` : ''}. Si no, puedes reservar de nuevo cuando quieras. 🙏`;
     case 'reminder_48h':
-      return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi necesitas mover la fecha, este es buen momento para avisarnos. Responde aquí.`;
+      return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\n${contact}`;
     case 'reminder_24h':
-      return `⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\nSi no puedes llegar, avísanos respondiendo aquí. 🙏`;
+      return `⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\n${contact} 🙏`;
     case 'reminder_1h':
       return `🔔 *${biz.name}*\n¡Te esperamos en 1 hora!\n\n💈 ${appt.service_name}\n🗓 ${when}`;
     case 'reminder_2h':
       return `🔔 *${biz.name}*\n¡Te esperamos en 2 horas!\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}`;
     case 'manual_assign':
-      return `✅ *${biz.name}*\n¡Te conseguimos turno!\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 ${appt.confirmation_code}\n\nNos vemos. Si no puedes, avísanos respondiendo aquí.`;
+      return `✅ *${biz.name}*\n¡Te conseguimos turno!\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 ${appt.confirmation_code}\n\nNos vemos. ${contact}`;
+    case 'rescheduled':
+      return `🔁 *${biz.name}*\nEl negocio movió tu cita. Así queda:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 ${appt.confirmation_code}\n\n${waLink ? `Si no te funciona, avísale al negocio: ${waLink}` : `Ver o cancelar tu cita: ${link}`}`;
+    case 'cancelled_business':
+      return `❌ *${biz.name}*\nEl negocio canceló tu cita:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 ${appt.confirmation_code}\n\n${waLink ? `Si tienes dudas o pagaste un depósito, escríbele al negocio: ${waLink}\n` : ''}Para reservar otra fecha: ${bookUrl(biz.slug)}`;
     case 'waitlist_offer':
-      return `⚡ *${biz.name} — ¡se liberó un cupo!*\nTienes *30 minutos* para tomarlo antes de que pase al siguiente.\n\nConfirma aquí: responde *SÍ* para quedártelo. Tu cita actual no se toca hasta que confirmes.`;
+      // Mensajes viejos (sin cita ligada) no traen el enlace de la oferta: mandan a reservar.
+      return `⚡ *${biz.name} — ¡se liberó un turno!*\n`
+        + (appt?.starts_at ? `\n💈 ${appt.service_name}\n🗓 ${when}\n` : '')
+        + `\nTienes *30 minutos* para tomarlo antes de que pase al siguiente en la lista.\n\n`
+        + (ctx.offerUrl ? `Tómalo aquí: ${ctx.offerUrl}` : `Reserva aquí: ${bookUrl(biz.slug)}`);
     case 'due_reminder':
       return `👋 *${biz.name}*\n¿Listo para tu próxima visita? Ya va siendo hora.\n\nReserva tu turno cuando quieras — aquí mismo. 💈`;
     default:
@@ -3479,10 +3564,12 @@ function waNumber(phone) {
 }
 async function sendWhatsApp(phone, text) {
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) return { skipped: true };
+  // Tope de 15 s: un Evolution colgado no puede trancar la cola (el error se reintenta).
   const r = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: EVOLUTION_API_KEY },
     body: JSON.stringify({ number: waNumber(phone), text }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!r.ok) throw new Error(`Evolution ${r.status}`);
   const j = await r.json().catch(() => ({}));
@@ -3497,6 +3584,7 @@ async function sendEmail(to, subject, text, html) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!r.ok) throw new Error(`Resend ${r.status}`);
   const j = await r.json().catch(() => ({}));
@@ -3716,15 +3804,29 @@ function emailAppt(template, ctx) {
   const bizName = emailEsc(biz?.name || '');
   const mapUrl = (biz?.lat != null && biz?.lng != null)
     ? `https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}` : '';
+  // Las respuestas a citas@bukeame.com no le llegan al negocio: se le manda a su WhatsApp.
+  const a = (href, label) => `<a href="${href}" style="color:#0A5B52;text-decoration:none">${label}</a>`;
+  const waLink = bizWaLink(biz);
+  const contactHtml = waLink ? `avísale al negocio por ${a(waLink, 'WhatsApp')}` : 'avísale al negocio';
   let title, intro, extra = '';
   switch (template) {
     case 'confirm':
       title = appt.status === 'pending_deposit' ? 'Tu cita está reservada' : 'Tu cita está confirmada';
       intro = appt.status === 'pending_deposit'
-        ? 'Tu cita quedó reservada, pendiente de depósito. Importante: el turno queda reservado por 30 minutos mientras el negocio valida el depósito; si no se valida a tiempo, se libera.'
+        ? 'Tu cita quedó reservada, pendiente de depósito. Importante: el turno queda reservado por 30 minutos mientras se valida el depósito; si no se valida a tiempo, se libera.'
         : 'Tu cita quedó confirmada. Te esperamos.';
-      if (appt.status === 'pending_deposit' && biz.ath_phone)
-        extra = `Para confirmar, envía el depósito de $${(appt.deposit_cents / 100).toFixed(2)} por ATH Móvil a ${emailEsc(biz.ath_phone)} y responde con tu referencia.`;
+      if (appt.status === 'pending_deposit')
+        extra = `Para confirmarla, paga el depósito de $${(appt.deposit_cents / 100).toFixed(2)} ${a(citaUrl(code), 'aquí')}`
+          + (biz.ath_phone ? ` (o envíalo por ATH Móvil al ${emailEsc(biz.ath_phone)} y pon la referencia en ese mismo enlace).` : '.');
+      break;
+    case 'rescheduled':
+      title = 'El negocio movió tu cita';
+      intro = `Así queda tu cita (fecha y hora de arriba). Si no te funciona, ${contactHtml}.`;
+      break;
+    case 'cancelled_business':
+      title = 'El negocio canceló tu cita';
+      intro = `Si tienes dudas o pagaste un depósito, ${contactHtml}.`;
+      extra = `Para reservar otra fecha, entra ${a(bookUrl(biz?.slug), 'aquí')}.`;
       break;
     case 'hold_expired':
       title = 'Tu reserva expiró';
@@ -3733,11 +3835,11 @@ function emailAppt(template, ctx) {
       break;
     case 'reminder_48h':
       title = 'Tu cita es en 2 días';
-      intro = 'Si necesitas mover la fecha, este es buen momento para avisarle al negocio.';
+      intro = `Si necesitas mover la fecha, este es buen momento: ${contactHtml}.`;
       break;
     case 'reminder_24h':
       title = 'Tu cita es mañana';
-      intro = 'Si no puedes llegar, avísale al negocio respondiendo a este correo o por WhatsApp.';
+      intro = `Si no puedes llegar, ${contactHtml}.`;
       break;
     case 'reminder_1h':
       title = 'Tu cita es en 1 hora';
@@ -3749,7 +3851,7 @@ function emailAppt(template, ctx) {
       break;
     case 'manual_assign':
       title = 'Te conseguimos turno';
-      intro = 'Si no puedes llegar, avísale al negocio respondiendo aquí.';
+      intro = `Si no puedes llegar, ${contactHtml}.`;
       break;
     default:
       title = 'Actualización de tu cita';
@@ -3760,6 +3862,8 @@ function emailAppt(template, ctx) {
     ['Servicio', svc],
     ['Fecha', when],
     code ? ['Código', code] : null,
+    (code && template !== 'cancelled_business' && template !== 'hold_expired')
+      ? ['Tu cita', a(citaUrl(code), 'Ver o cancelar')] : null,
     (template === 'reminder_2h' && addr) ? ['Lugar', addr] : null,
     (template === 'reminder_2h' && mapUrl)
       ? ['Cómo llegar', `<a href="${mapUrl}" style="color:#0A5B52;text-decoration:none">Ver en el mapa</a>`] : null,
@@ -3809,21 +3913,78 @@ async function queueReminders() {
   }
 }
 
-// Despacha lo queued (máx 20 por ciclo, con reintento implícito al quedar queued)
+// Migración 33 (reintentos de avisos): columnas attempts/next_attempt_at y el estado
+// 'skipped'. Hasta que se corra, la cola trabaja como antes (sin reintentos).
+let MSG_V2 = false;
+async function checkMsgV2() {
+  const r = await db.query(`SELECT 1 FROM information_schema.columns WHERE table_name = 'message_log' AND column_name = 'next_attempt_at'`);
+  MSG_V2 = r.rowCount > 0;
+  return MSG_V2;
+}
+checkMsgV2()
+  .then(ok => { if (!ok) console.warn('⚠ Falta la migración 33: los avisos que fallen no se reintentan.'); })
+  .catch(e => console.error('MSG_V2:', e.message));
+
+// Avisos atados a una cita activa: si la cita ya pasó o se canceló antes de salir
+// (p.ej. mientras esperaba un reintento), no se mandan.
+const APPT_TEMPLATES = new Set(['confirm', 'reminder_48h', 'reminder_24h', 'reminder_2h', 'reminder_1h', 'manual_assign', 'rescheduled']);
+const RETRY_DELAYS_MIN = [5, 30];   // 1er fallo → reintenta en 5 min; 2do → en 30; 3ro → 'failed'
+
+// Un recordatorio solo sale si la cita sigue cayendo en su ventana (p.ej. tras un
+// reintento o si la movieron, el de 24 h ya no diría "mañana" con verdad).
+const REMINDER_WINDOW_H = { reminder_48h: [36, 60], reminder_24h: [12, 30], reminder_2h: [0.75, 3], reminder_1h: [0.3, 1.5] };
+
+function staleReason(m) {
+  if (APPT_TEMPLATES.has(m.template)) {
+    if (!m.starts_at) return 'la cita ya no existe';
+    if (!ALIVE.includes(m.status)) return 'la cita ya no está activa';
+    if (new Date(m.starts_at) < new Date()) return 'la cita ya pasó';
+    const win = REMINDER_WINDOW_H[m.template];
+    const h = (new Date(m.starts_at) - Date.now()) / 3600_000;
+    if (win && (h < win[0] || h > win[1])) return 'el recordatorio ya no cae en su hora';
+  }
+  if (m.template === 'cancelled_business' && m.status !== 'cancelled_business') return 'la cita se reactivó';
+  if (m.template === 'waitlist_offer' && m.appointment_id && !m.waitlist_id) return 'la oferta ya no está vigente';
+  return null;
+}
+
+// Despacha lo queued (máx 20 por ciclo). Un error temporal (caída de Evolution/Resend,
+// 5xx, red, llave o instancia mal puestas) se reintenta a los 5 y a los 30 min; un 400/
+// 422 (número sin WhatsApp, email inválido) no se reintenta porque fallaría igual.
+let dispatching = false;
 async function dispatchMessages() {
+  if (dispatching) return;   // una corrida lenta no se pisa con la siguiente (evita envíos dobles)
+  dispatching = true;
+  try { await dispatchBatch(); } finally { dispatching = false; }
+}
+async function dispatchBatch() {
   const { rows } = await db.query(
-    `SELECT m.id, m.channel, m.recipient, m.template, m.appointment_id,
+    `SELECT m.id, m.channel, m.recipient, m.template, m.appointment_id, ${MSG_V2 ? 'm.attempts' : '0 AS attempts'},
             a.starts_at, a.service_name, a.confirmation_code, a.status, a.deposit_cents,
-            b.name, b.ath_phone, b.address_line, b.lat, b.lng
+            b.name, b.slug, b.whatsapp, b.phone, b.ath_phone, b.address_line, b.lat, b.lng,
+            w.id AS waitlist_id
        FROM message_log m
        LEFT JOIN appointments a ON a.id = m.appointment_id
        JOIN businesses b ON b.id = m.business_id
-      WHERE m.status = 'queued'
+       LEFT JOIN LATERAL (
+         SELECT wl.id FROM waitlist wl JOIN clients c ON c.id = wl.client_id
+          WHERE m.template = 'waitlist_offer' AND wl.offered_appointment_id = m.appointment_id
+            AND wl.offer_state = 'offered' AND wl.offer_expires_at > now() AND c.phone = m.recipient
+          LIMIT 1) w ON true
+      WHERE m.status = 'queued'${MSG_V2 ? ' AND (m.next_attempt_at IS NULL OR m.next_attempt_at <= now())' : ''}
       ORDER BY m.created_at LIMIT 20`);
   for (const m of rows) {
+    const skip = staleReason(m);
+    if (skip) {
+      await db.query(`UPDATE message_log SET status = $2::msg_status, error = $3 WHERE id = $1`,
+        [m.id, MSG_V2 ? 'skipped' : 'failed', 'omitido: ' + skip]);
+      continue;
+    }
     const ctx = {
-      biz: { name: m.name, ath_phone: m.ath_phone, address_line: m.address_line, lat: m.lat, lng: m.lng },
+      biz: { name: m.name, slug: m.slug, whatsapp: m.whatsapp, phone: m.phone, ath_phone: m.ath_phone,
+             address_line: m.address_line, lat: m.lat, lng: m.lng },
       appt: m,
+      offerUrl: m.waitlist_id ? `${SITE_URL}/oferta.html?id=${m.waitlist_id}` : null,
     };
     try {
       let out;
@@ -3833,18 +3994,94 @@ async function dispatchMessages() {
         const e = emailAppt(m.template, ctx);
         out = await sendEmail(m.recipient, e.subject, e.text, e.html);
       }
-      if (out.skipped) continue;   // proveedor sin configurar: se queda queued
-      await db.query(`UPDATE message_log SET status = 'sent', sent_at = now(), provider_ref = $2 WHERE id = $1`,
+      if (out.skipped) {
+        // Proveedor sin configurar: se queda en cola. Con la migración 33 se aparta
+        // 10 min para no tapar la cola (20 de estos bloqueaban todo lo demás).
+        if (MSG_V2) await db.query(`UPDATE message_log SET next_attempt_at = now() + interval '10 minutes' WHERE id = $1`, [m.id]);
+        continue;
+      }
+      await db.query(`UPDATE message_log SET status = 'sent', sent_at = now(), provider_ref = $2, error = NULL WHERE id = $1`,
         [m.id, out.id || null]);
     } catch (e) {
-      await db.query(`UPDATE message_log SET status = 'failed', error = $2 WHERE id = $1`,
-        [m.id, e.message.slice(0, 200)]);
+      const err = String(e.message || e).slice(0, 200);
+      // Solo 400/422 son del mensaje en sí (número sin WhatsApp, email inválido). 401/404
+      // son de configuración (llave o instancia): se reintentan mientras se arregla.
+      const permanent = /\b(400|422)\b/.test(err);
+      const wait = MSG_V2 && !permanent ? RETRY_DELAYS_MIN[m.attempts] : undefined;
+      if (wait)
+        await db.query(`UPDATE message_log SET attempts = attempts + 1, error = $2,
+                          next_attempt_at = now() + make_interval(mins => $3::int) WHERE id = $1`, [m.id, err, wait]);
+      else
+        await db.query(`UPDATE message_log SET status = 'failed', error = $2${MSG_V2 ? ', attempts = attempts + 1' : ''} WHERE id = $1`,
+          [m.id, err]);
+      console.error(`aviso ${m.template}/${m.channel} falló${wait ? ` (reintento en ${wait} min)` : ''}:`, err);
     }
   }
 }
 
 setInterval(() => { queueReminders().catch(e => console.error('reminders:', e.message)); }, 60_000);
 setInterval(() => { dispatchMessages().catch(e => console.error('dispatch:', e.message)); }, 20_000);
+
+// ── Vigilante de avisos ─────────────────────────────────────────────────────
+// Entre jul y sep-2026 WhatsApp estuvo caído 2½ meses sin que nadie se enterara.
+// Cada 15 min revisa que la instancia de Evolution esté "open", que la cola salga y
+// que no se acumulen fallos. Si algo anda mal, avisa al admin por email (a
+// ADMIN_ALERT_EMAIL, o si no está, a los admins de plataforma) y por WhatsApp a
+// ADMIN_ALERT_WHATSAPP si está puesto. Máximo un aviso por problema cada 6 h.
+const WATCH_REPEAT_MS = 6 * 3600_000;
+const watchLastAlert = {};
+async function watchdogAvisos() {
+  const problems = [];   // [clave, texto]
+  if (EVOLUTION_API_URL && EVOLUTION_API_KEY) {
+    try {
+      const r = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${EVOLUTION_INSTANCE}`,
+        { headers: { apikey: EVOLUTION_API_KEY }, signal: AbortSignal.timeout(10_000) });
+      const j = await r.json().catch(() => ({}));
+      const state = j?.instance?.state || j?.state;
+      if (state !== 'open')
+        problems.push(['wa', `WhatsApp está desconectado (estado de Evolution: ${state || 'HTTP ' + r.status}). No están saliendo confirmaciones ni recordatorios.`]);
+    } catch (e) { problems.push(['wa', `No se pudo hablar con Evolution (${e.message}). No están saliendo los WhatsApp.`]); }
+  } else problems.push(['wa', 'Faltan EVOLUTION_API_URL o EVOLUTION_API_KEY en el .env: no sale ningún WhatsApp.']);
+  if (!RESEND_API_KEY) problems.push(['email', 'Falta RESEND_API_KEY en el .env: no sale ningún email.']);
+  // Se vuelve a mirar: si corrieron la migración sin reiniciar, los reintentos se prenden solos.
+  if (!MSG_V2 && !(await checkMsgV2().catch(() => false)))
+    problems.push(['mig', 'Falta correr la migración 33-schema-avisos-reintentos.sql: los avisos que fallan no se reintentan.']);
+
+  const { rows: [q] } = await db.query(
+    `SELECT count(*) FILTER (WHERE status = 'queued' AND created_at < now() - interval '15 minutes'
+                               ${MSG_V2 ? 'AND (next_attempt_at IS NULL OR next_attempt_at <= now())' : ''})::int AS atascados,
+            count(*) FILTER (WHERE status = 'failed' AND channel = 'whatsapp' AND created_at > now() - interval '1 hour')::int AS fallos_wa,
+            count(*) FILTER (WHERE status = 'failed' AND channel = 'email' AND created_at > now() - interval '1 hour')::int AS fallos_email
+       FROM message_log WHERE created_at > now() - interval '2 days'`);
+  if (q.atascados >= 5) problems.push(['cola', `Hay ${q.atascados} avisos atascados en la cola hace más de 15 minutos.`]);
+  if (q.fallos_wa >= 3) problems.push(['wa_fallos', `${q.fallos_wa} WhatsApp fallaron en la última hora.`]);
+  if (q.fallos_email >= 3) problems.push(['email_fallos', `${q.fallos_email} emails fallaron en la última hora.`]);
+
+  // El tope de 6 h vale aunque el problema se arregle y vuelva (si no, uno que va y
+  // viene mandaría un email cada 15 min).
+  const now = Date.now();
+  const fresh = problems.filter(([k]) => !(watchLastAlert[k] && now - watchLastAlert[k] < WATCH_REPEAT_MS));
+  if (!fresh.length) return;
+  for (const [k] of fresh) watchLastAlert[k] = now;
+
+  const text = `Bukéame — problema con los avisos\n\n${fresh.map(([, t]) => '- ' + t).join('\n')}\n\n`
+    + `Para ver el detalle, en el servidor: cd /var/www/bukeame/backend && node diag-avisos.js`;
+  console.error('⚠ vigilante de avisos:', fresh.map(([, t]) => t).join(' | '));
+  let to = (process.env.ADMIN_ALERT_EMAIL || '').split(',').map(s => s.trim()).filter(isEmail);
+  if (!to.length) {
+    try { to = (await db.query(`SELECT email FROM users WHERE is_platform_admin AND email IS NOT NULL`)).rows.map(r => r.email); }
+    catch (e) { console.error('vigilante admins:', e.message); }
+  }
+  for (const addr of to)
+    await sendLogged(null, null, 'email', addr, 'admin_watchdog', () => sendEmail(addr, 'Problema con los avisos — Bukéame', text));
+  const adminWa = process.env.ADMIN_ALERT_WHATSAPP;
+  if (adminWa && !fresh.some(([k]) => k === 'wa'))
+    await sendLogged(null, null, 'whatsapp', adminWa, 'admin_watchdog', () => sendWhatsApp(adminWa, text));
+}
+setTimeout(() => {
+  watchdogAvisos().catch(e => console.error('vigilante:', e.message));
+  setInterval(() => { watchdogAvisos().catch(e => console.error('vigilante:', e.message)); }, 15 * 60_000);
+}, 2 * 60_000);
 
 // ── Worker: ciclo de vida del cobro ────────────────────────────────────────
 // El beneficio (add-on / plan de pago) se mantiene durante el período pagado +
@@ -3872,19 +4109,28 @@ setInterval(() => { expireBilling().catch(e => console.error('expireBilling:', e
 // ── Re-encola la confirmación al CLIENTE cuando la cita pasa a 'confirmed' tras validar
 // el depósito (manual efectivo/ATH o tarjeta). Espeja el encolado de la reserva; el worker
 // dispatchMessages lo despacha por WhatsApp (+ email si hay). Falla suave.
-async function enqueueApptConfirm(businessId, appointmentId) {
+async function enqueueApptConfirm(businessId, appointmentId, opts) {
+  await enqueueClientMsg(businessId, appointmentId, 'confirm', opts);
+}
+// Encola un aviso al cliente de la cita (WhatsApp + email si tiene). opts.email=false
+// cuando ya le llegó otro correo por el mismo evento (p.ej. el recibo del depósito).
+// Si ya hay uno igual en cola para esa cita, no se repite: el mensaje se arma al salir
+// con los datos de ese momento (dos "movieron tu cita" seguidos salen como uno).
+async function enqueueClientMsg(businessId, appointmentId, template, { email = true } = {}) {
+  const put = (channel, recipient) => db.query(
+    `INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
+     SELECT $1::uuid, $2::uuid, $3::msg_channel, $4::text, $5::text
+      WHERE NOT EXISTS (SELECT 1 FROM message_log WHERE appointment_id = $2 AND template = $5
+                          AND channel = $3::msg_channel AND status = 'queued')`,
+    [businessId, appointmentId, channel, recipient, template]);
   try {
     const c = await db.query(
       `SELECT cl.phone, cl.email FROM appointments a JOIN clients cl ON cl.id = a.client_id WHERE a.id = $1`,
       [appointmentId]);
     const row = c.rows[0]; if (!row) return;
-    if (row.phone)
-      await db.query(`INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
-         VALUES ($1,$2,'whatsapp',$3,'confirm')`, [businessId, appointmentId, row.phone]);
-    if (row.email && isEmail(row.email))
-      await db.query(`INSERT INTO message_log (business_id, appointment_id, channel, recipient, template)
-         VALUES ($1,$2,'email',$3,'confirm')`, [businessId, appointmentId, row.email.toLowerCase()]);
-  } catch (e) { console.error('enqueueApptConfirm:', e.message); }
+    if (row.phone) await put('whatsapp', row.phone);
+    if (email && row.email && isEmail(row.email)) await put('email', row.email.toLowerCase());
+  } catch (e) { console.error(`enqueueClientMsg ${template}:`, e.message); }
 }
 
 // Aplana texto controlado por el cliente (nombre, referencia) antes de meterlo en
@@ -3894,39 +4140,73 @@ function oneLine(s) {
   return String(s == null ? '' : s).replace(/[\u0000-\u001F\u007F]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// Envío DIRECTO (sin pasar por la cola) que deja rastro en message_log: 'sent' o
+// 'failed' con el error. Antes los avisos al dueño fallaban en silencio. Nunca lanza.
+async function sendLogged(businessId, appointmentId, channel, recipient, template, send) {
+  let status = 'sent', ref = null, err = null;
+  try {
+    const out = await send();
+    if (out && out.skipped) return;   // proveedor sin configurar
+    ref = (out && out.id) || null;
+  } catch (e) {
+    status = 'failed';
+    err = String(e.message || e).slice(0, 200);
+    console.error(`aviso ${template}/${channel} falló:`, err);
+  }
+  try {
+    await db.query(
+      `INSERT INTO message_log (business_id, appointment_id, channel, recipient, template, status, provider_ref, error, sent_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [businessId, appointmentId || null, channel, recipient, template, status, ref, err, status === 'sent' ? new Date() : null]);
+  } catch (e) { console.error('sendLogged:', e.message); }
+}
+
+// Aviso al DUEÑO del negocio: in-app (+ push) siempre; WhatsApp y email según los
+// interruptores del negocio (notify_wa / notify_email, migración 31).
+async function alertOwner(businessId, appointmentId, { type, title, body, wa, template }) {
+  try { await notify(businessId, type, title, body, { appointment_id: appointmentId }); }
+  catch (e) { console.error('alertOwner notify:', e.message); }
+  let row;
+  try {
+    row = (await db.query(
+      `SELECT b.whatsapp, b.notify_wa, b.notify_email, u.email FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`,
+      [businessId])).rows[0];
+  } catch (e) { console.error('alertOwner:', e.message); return; }
+  if (!row) return;
+  if (row.whatsapp && row.notify_wa)
+    await sendLogged(businessId, appointmentId, 'whatsapp', row.whatsapp, template, () => sendWhatsApp(row.whatsapp, wa));
+  if (row.email && row.notify_email)
+    await sendLogged(businessId, appointmentId, 'email', row.email, template, () => sendEmail(row.email, `${title} — Bukéame`, body));
+}
+
 // ── Aviso al NEGOCIO: tiene un depósito por validar (in-app + WhatsApp + email) ──
 // El WhatsApp dice que se valida EN LA PLATAFORMA (panel), NUNCA "aquí" por el chat.
 async function alertDepositToValidate(businessId, appointmentId, detail) {
   detail = oneLine(detail).slice(0, 200);
-  const body = `Depósito por validar: ${detail}. Valídalo en tu panel: Agenda → la cita → "Validar depósito y aceptar".`;
-  try { await notify(businessId, 'payment', 'Depósito por validar', body, { appointment_id: appointmentId }); } catch (e) {}
-  try {
-    const b = await db.query(
-      `SELECT b.whatsapp, b.notify_wa, b.notify_email, u.email FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`, [businessId]);
-    const row = b.rows[0]; if (!row) return;
-    if (row.whatsapp && row.notify_wa) {
-      const wa = `*Bukéame* — Depósito por validar\n\n${detail}\n\nValídalo en tu panel de Bukéame: Agenda → la cita → "Validar depósito y aceptar". (No se valida por este chat.)`;
-      try { await sendWhatsApp(row.whatsapp, wa); } catch (e) {}
-    }
-    if (row.email && row.notify_email) { try { await sendEmail(row.email, 'Depósito por validar — Bukéame', body); } catch (e) {} }
-  } catch (e) {}
+  await alertOwner(businessId, appointmentId, {
+    type: 'payment', title: 'Depósito por validar', template: 'owner_deposit',
+    body: `Depósito por validar: ${detail}. Valídalo en tu panel: Agenda → la cita → "Validar depósito y aceptar".`,
+    wa: `*Bukéame* — Depósito por validar\n\n${detail}\n\nValídalo en tu panel de Bukéame: Agenda → la cita → "Validar depósito y aceptar". (No se valida por este chat.)`,
+  });
 }
 
 // ── Aviso al NEGOCIO de una nueva cita (in-app + email + WhatsApp al dueño) ──
 async function alertNewAppointment(businessId, appointmentId, detail, pendingDeposit) {
   detail = oneLine(detail).slice(0, 200);
   const title = pendingDeposit ? 'Nueva cita — pendiente de depósito' : 'Nueva cita';
-  try { await notify(businessId, 'new_appointment', title, detail, { appointment_id: appointmentId }); } catch (e) {}
-  try {
-    const b = await db.query(
-      `SELECT b.whatsapp, b.notify_wa, b.notify_email, u.email FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`, [businessId]);
-    const row = b.rows[0]; if (!row) return;
-    if (row.whatsapp && row.notify_wa) {
-      const wa = `*Bukéame* — ${title}\n\n${detail}\n\nMírala en tu panel de Bukéame: Agenda.`;
-      try { await sendWhatsApp(row.whatsapp, wa); } catch (e) {}
-    }
-    if (row.email && row.notify_email) { try { await sendEmail(row.email, `${title} — Bukéame`, detail); } catch (e) {} }
-  } catch (e) {}
+  await alertOwner(businessId, appointmentId, {
+    type: 'new_appointment', title, body: detail, template: 'owner_new_appt',
+    wa: `*Bukéame* — ${title}\n\n${detail}\n\nMírala en tu panel de Bukéame: Agenda.`,
+  });
+}
+
+// ── Aviso al NEGOCIO: el cliente canceló (antes solo quedaba dentro del panel) ──
+async function alertClientCancel(businessId, appointmentId, detail) {
+  detail = oneLine(detail).slice(0, 200);
+  await alertOwner(businessId, appointmentId, {
+    type: 'cancellation', title: 'Cita cancelada', body: detail, template: 'owner_cancel',
+    wa: `*Bukéame* — Cita cancelada por el cliente\n\n${detail}\n\nEl turno quedó libre en tu agenda.`,
+  });
 }
 
 // ── Recordatorio de renovación: 3 días y 1 día antes de vencer plan/add-on ──
@@ -3938,12 +4218,14 @@ async function sendRenewReminder(r, kind, code, stage) {
   const cap = what.charAt(0).toUpperCase() + what.slice(1);
   const fecha = new Date(r.current_period_end).toLocaleDateString('es-PR', { day: 'numeric', month: 'long' });
   const body = `${cap} vence en ${stage.lbl} (el ${fecha}). Renuévalo desde tu panel en bukeame.com para no perder el servicio.`;
-  try { await notify(r.business_id, 'system', 'Renovación próxima', body, {}); } catch (e) {}
+  try { await notify(r.business_id, 'system', 'Renovación próxima', body, {}); } catch (e) { console.error('renovación notify:', e.message); }
   if (r.whatsapp) {
     const wa = `*Bukéame* — Renovación próxima\n\n${cap} vence en ${stage.lbl} (el ${fecha}).\nRenuévalo desde tu panel en bukeame.com para no perder el servicio.`;
-    try { await sendWhatsApp(r.whatsapp, wa); } catch (e) {}
+    await sendLogged(r.business_id, null, 'whatsapp', r.whatsapp, 'owner_renewal', () => sendWhatsApp(r.whatsapp, wa));
   }
-  if (r.owner_email) { try { await sendEmail(r.owner_email, 'Tu renovación está próxima — Bukéame', body); } catch (e) {} }
+  if (r.owner_email)
+    await sendLogged(r.business_id, null, 'email', r.owner_email, 'owner_renewal',
+      () => sendEmail(r.owner_email, 'Tu renovación está próxima — Bukéame', body));
 }
 async function remindRenewals() {
   for (const stage of [{ d: 3, lbl: '3 días' }, { d: 1, lbl: '1 día' }]) {
@@ -4055,6 +4337,7 @@ const sharedHelpers = {
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
   sendEmail, emailPlatformReceipt, emailReceipt, emailGiftCard,
+  enqueueApptConfirm, alertOwner, fmtPR, oneLine, citaUrl,
   // 2FA/TOTP (crypto puro) para el panel admin:
   totp: {
     genSecret: totpGenSecret, verify: totpVerify, enc: totpEnc, dec: totpDec,

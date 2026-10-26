@@ -107,13 +107,13 @@ async function load(){
     return;
   }
   const list=(r.data.waitlist)?r.data.waitlist:(Array.isArray(r.data)?r.data:[]);
-  content.innerHTML='<div class="info">💡 Cuando se abra un espacio, podrás ofrecerlo a quien esté en la lista. Recibirán un aviso por WhatsApp.</div>';
+  content.innerHTML='<div class="info">Cuando se cancela una cita, Bukéame le ofrece ese turno por WhatsApp al primero de la lista que le sirva. Tiene 30 minutos para tomarlo; si no, pasa al siguiente.</div>';
   if(list.length===0){
     content.innerHTML+='<div class="empty">No hay nadie en lista de espera.<br>Cuando tu agenda se llene, los clientes podrán anotarse.</div>';
     return;
   }
   content.innerHTML+=list.map(function(w,i){
-    const offered=w.offer_state&&w.offer_state!=='none'?'<span class="offered">Ofrecido</span>':'';
+    const offered=w.offer_state==='offered'?'<span class="offered">Turno ofrecido</span>':'';
     return '<div class="wl"><div class="pos">'+(w.position||i+1)+'</div><div class="grow"><h4>'+esc(w.full_name||'Cliente')+' '+offered+'</h4><p>'+(w.service_name?esc(w.service_name):'Cualquier servicio')+(w.staff_name?(' · '+esc(w.staff_name)):'')+'</p></div><button class="del" data-id="'+esc(w.id)+'">Quitar</button></div>';
   }).join('');
   content.querySelectorAll('.del').forEach(function(b){

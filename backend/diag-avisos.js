@@ -38,8 +38,17 @@ const q = async (sql) => (await db.query(sql)).rows;
   for (const r of await q(`SELECT channel, max(sent_at) t FROM message_log WHERE status = 'sent' GROUP BY 1`))
     out('  ' + r.channel.padEnd(9), fmt(r.t));
 
-  const [stuck] = await q(`SELECT count(*)::int n FROM message_log WHERE status = 'queued' AND created_at < now() - interval '5 minutes'`);
+  // Con la migración 33 los que fallan esperan su reintento en la cola: eso no es atasco.
+  const [{ v2 }] = await q(`SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                              WHERE table_name = 'message_log' AND column_name = 'next_attempt_at') AS v2`);
+  out('=== Migración 33 (reintentos) ===\n  ', v2 ? 'aplicada' : 'FALTA: los avisos que fallan no se reintentan');
+  const [stuck] = await q(`SELECT count(*)::int n FROM message_log WHERE status = 'queued' AND created_at < now() - interval '5 minutes'
+                             ${v2 ? 'AND (next_attempt_at IS NULL OR next_attempt_at <= now())' : ''}`);
   out('=== Atascados en cola (más de 5 min) ===\n  ', stuck.n, stuck.n ? '<- PROBLEMA: no están saliendo' : '(bien)');
+  if (v2) {
+    const [r] = await q(`SELECT count(*)::int n FROM message_log WHERE status = 'queued' AND next_attempt_at > now()`);
+    out('  esperando reintento:', r.n);
+  }
 
   out('=== Últimos 5 fallos ===');
   const fails = await q(`SELECT created_at, channel, template, error FROM message_log WHERE status = 'failed' ORDER BY created_at DESC LIMIT 5`);
