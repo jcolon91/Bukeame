@@ -124,6 +124,14 @@
 
   function injectToggle() {
     if (document.querySelector('.lang-tg')) return;
+    // En celulares angostos (≤360px) Claro/Oscuro + ES/EN no cabían en los encabezados y la
+    // página se corría de lado: se achican los dos selectores en todas las páginas.
+    if (!document.getElementById('bk-tg-compact')) {
+      var st = document.createElement('style');
+      st.id = 'bk-tg-compact';
+      st.textContent = '@media(max-width:360px){.theme-tg button{padding:5px 7px!important;font-size:10.5px!important}.lang-tg{margin-left:4px!important}}';
+      document.head.appendChild(st);
+    }
     var tg = document.createElement('div');
     var host = document.querySelector('.theme-tg');
     tg.className = 'theme-tg lang-tg';

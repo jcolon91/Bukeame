@@ -209,6 +209,7 @@ html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;
 .tl-evt.is-done-state{opacity:.5}
 .tl-evt.is-done-state .tl-ico{color:#A33A24}
 .tl-evt.is-pending{border-left-style:dashed}
+.tl-evt .tl-dep{display:inline-block;font-family:var(--body);font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#5c3d0c;background:var(--mango);border-radius:6px;padding:1px 5px;margin-right:5px;vertical-align:1px}
 .tl-evt.is-arrived{box-shadow:0 0 0 2px var(--mango) inset,0 1px 2px rgba(0,0,0,.05)}
 .tl-evt.is-open{box-shadow:0 0 0 2px var(--green) inset,0 6px 18px rgba(0,0,0,.18);transform:translateY(-1px)}
 /* Pin de "Llegó" dentro del bloque */
@@ -2371,6 +2372,14 @@ function weekStart(s){ const d=ymdToDate(s); const dow=d.getDay(); const diff=(d
 const DOW_ES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const MONTH_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 function hourLabel(iso){ try{ return new Date(iso).toLocaleTimeString('es-PR',{timeZone:PR_TZ,hour:'numeric',minute:'2-digit',hour12:true}); }catch(e){ return ''; } }
+// "10:00 am" (la de arriba da "10:00 a. m.", larga para los bloques de la agenda)
+function hourShort(iso){
+  try{
+    const p = new Intl.DateTimeFormat('en-US',{timeZone:PR_TZ,hour:'numeric',minute:'2-digit',hour12:true}).formatToParts(new Date(iso));
+    const g = function(t){ const x = p.find(function(q){ return q.type===t; }); return x ? x.value : ''; };
+    return g('hour')+':'+g('minute')+' '+g('dayPeriod').toLowerCase();
+  }catch(e){ return hourLabel(iso); }
+}
 // Día local PR (YYYY-MM-DD) a partir del starts_at ISO de una cita.
 function apptDay(iso){ try{ return new Date(iso).toLocaleDateString('en-CA',{timeZone:PR_TZ}); }catch(e){ return ''; } }
 
@@ -2381,7 +2390,13 @@ async function loadDashboard(){
   const dash = await api('GET','/dashboard/today');
   if(dash.ok){
     const d = dash.data;
-    document.getElementById('bizSubtitle').textContent = 'Hoy · '+ (d.date||'');
+    // "Hoy · lunes, 26 de octubre" (antes salía 2026-10-26 y se partía en celular)
+    var hoyTxt = d.date || '';
+    if(/^\d{4}-\d{2}-\d{2}$/.test(hoyTxt)){
+      var p = hoyTxt.split('-').map(Number);
+      hoyTxt = new Date(p[0], p[1]-1, p[2]).toLocaleDateString('es-PR', { weekday:'long', day:'numeric', month:'long' });
+    }
+    document.getElementById('bizSubtitle').textContent = 'Hoy · ' + hoyTxt;
     document.getElementById('kpis').innerHTML =
       '<div class="kpi"><small>Citas hoy</small><b>'+(d.citas||0)+'</b></div>'+
       '<div class="kpi"><small>Ingresos hoy</small><b>'+money(d.ingresos_cents)+'</b></div>'+
@@ -2518,7 +2533,9 @@ function buildDayTimeline(list, items, staff){
 
   // Rejilla: gutter + 1 columna por profesional.
   let h = legend +
-    '<div class="tl-scroll"><div class="tl-grid" style="grid-template-columns:'+GUT+'px repeat('+staff.length+','+COLW+'px);grid-template-rows:'+HEADH+'px '+bodyH+'px">';
+    // Las columnas llenan el ancho (mínimo COLW; en celular sigue el scroll de lado):
+    // con ancho fijo, en computadora sobraba media pantalla y el servicio salía cortado.
+    '<div class="tl-scroll"><div class="tl-grid" style="grid-template-columns:'+GUT+'px repeat('+staff.length+',minmax('+COLW+'px,1fr));grid-template-rows:'+HEADH+'px '+bodyH+'px">';
 
   // Fila de encabezados.
   h += '<div class="tl-corner"></div>';
@@ -2573,7 +2590,9 @@ function buildDayTimeline(list, items, staff){
       // fondo a baja opacidad del color del staff
       const bg = (col)+'22';
       const who = a.client_name || a.service_name || 'Cita';
-      const sub = hourLabel(a.starts_at) + (a.service_name? (' · '+a.service_name) : '');
+      // Hora corta ("10:00 am") para que quepa el servicio en la misma línea.
+      const sub = hourShort(a.starts_at) + (a.service_name? (' · '+a.service_name) : '');
+      const depTag = isPending ? '<span class="tl-dep">Depósito</span>' : '';
       // FAB (3 puntos) solo en citas accionables.
       const fab = isActive ? '<button class="tl-fab" data-fab="1" aria-label="Acciones"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>' : '';
       h += '<div class="'+cls+'" data-id="'+esc(a.id)+'" data-st="'+esc(st)+'"'+
@@ -2582,7 +2601,7 @@ function buildDayTimeline(list, items, staff){
         ' data-start="'+esc(a.starts_at)+'"'+
         ' data-dep-id="'+esc((a.deposit&&a.deposit.id)||'')+'" data-dep-method="'+esc((a.deposit&&a.deposit.method)||'')+'" data-dep-status="'+esc((a.deposit&&a.deposit.status)||'')+'" data-dep-manual="'+((a.deposit&&a.deposit.manual_validate)?'1':'')+'"'+
         ' style="top:'+top+'px;height:'+hgt+'px;background:'+esc(bg)+';border-left-color:'+esc(col)+'">'+
-        fab+'<b>'+ico+esc(who)+'</b><small>'+esc(sub)+'</small></div>';
+        fab+'<b>'+ico+esc(who)+'</b><small>'+depTag+esc(sub)+'</small></div>';
     });
     // punto de la línea AHORA en cada columna
     if(showNow){

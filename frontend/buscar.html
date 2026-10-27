@@ -42,6 +42,7 @@ input,select{font:inherit}
 .nav .logo{font-family:var(--display);font-weight:800;font-size:21px;letter-spacing:-.01em}.nav .logo i{font-style:normal;color:var(--green)}
 .nav .navright{display:flex;align-items:center;gap:12px}
 .nav a.login{font-size:13px;font-weight:600;color:var(--green)}
+@media(max-width:360px){.nav{padding:12px 12px;gap:6px}.nav .navright{gap:6px}.nav a.login{font-size:12px}}
 /* ---- Menú de sesión ---- */
 .umenu{position:relative}
 .uavatar{display:inline-flex;align-items:center;gap:7px;background:var(--card-soft);border:1.5px solid var(--border);border-radius:99px;padding:4px 10px 4px 4px;cursor:pointer;transition:.15s}
@@ -120,6 +121,10 @@ input,select{font:inherit}
 .results,.toplist{padding:4px 0 10px}
 .count{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:13px}
+/* En la rejilla la tarjeta llena su columna (el ancho fijo de 215px es para el carrusel):
+   en celular quedaba media pantalla vacía. Dos columnas en celular. */
+.grid .mcard{width:auto;min-width:0}
+@media(max-width:520px){.grid{grid-template-columns:1fr 1fr;gap:10px}.grid .mcard .top{height:96px}}
 
 /* ---- Tarjeta de resultado estilo Booksy (cada negocio destaca) ---- */
 .reslist{display:grid;gap:16px}

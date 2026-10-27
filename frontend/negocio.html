@@ -188,7 +188,9 @@ html[data-theme="dark"] .hero-logo.no-logo{
 .datebtn .mon{font-size:10px;opacity:.7}
 
 .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:8px;margin-top:4px}
-.slot{padding:11px 0;border:1.5px solid var(--line);border-radius:12px;text-align:center;font-family:var(--mono);font-weight:700;font-size:13px;cursor:pointer;background:var(--card)}
+.slot{padding:12px 0;border:1.5px solid var(--line);border-radius:12px;text-align:center;font-family:var(--mono);font-weight:700;font-size:13px;cursor:pointer;background:var(--card);white-space:nowrap}
+.slot-group+.slot-group{margin-top:16px}
+.slot-gl{font-size:12.5px;font-weight:700;color:var(--ink2);margin:0 0 6px 2px}
 .slot:hover{border-color:var(--teal)}
 .slot.sel{border-color:var(--green);background:var(--green);color:var(--green-ink)}
 .slots-empty{text-align:center;color:var(--ink2);font-size:13.5px;padding:24px;background:var(--card);border:1px dashed var(--line);border-radius:14px;line-height:1.6}
@@ -203,6 +205,8 @@ html[data-theme="dark"] .hero-logo.no-logo{
 .summary .row{display:flex;justify-content:space-between;font-size:14px;padding:6px 0}
 .summary .row.tot{border-top:1px solid var(--line);margin-top:6px;padding-top:12px;font-weight:700}
 .summary .row span:first-child{color:var(--ink2)}
+.summary .row.dep-now{margin-top:8px;padding:10px 12px;border-radius:12px;background:var(--teal-soft)}
+.summary .row.dep-now span:first-child,.summary .row.dep-now b{color:var(--teal)}
 
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font-weight:700;font-size:16px;padding:15px;border-radius:14px;cursor:pointer}
 .btn-teal{background:var(--green);color:var(--green-ink)}
@@ -397,10 +401,16 @@ html[data-embed="1"] .foot{display:none}
 
 /* ── Galería hero (scroll horizontal de fotos del negocio) ── */
 .bk-hero{position:relative;background:var(--bg2)}
-.bk-topnav{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
-.bk-topnav .theme-tg{background:rgba(0,0,0,.32);border-color:rgba(255,255,255,.25);backdrop-filter:blur(6px)}
-.bk-topnav .theme-tg button{color:rgba(255,255,255,.85)}
+/* Barra propia ENCIMA del banner (antes flotaba sobre la foto y tapaba el arte del negocio:
+   su teléfono, su logo). Mismos colores del tema. */
+.bk-topnav{position:relative;z-index:6;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border)}
+.bk-topnav .burger{width:42px;height:42px;background:var(--card);border:1px solid var(--border);backdrop-filter:none}
+.bk-topnav .burger:hover{background:var(--card-soft)}
+.bk-topnav .burger span{background:var(--text)}
 .bk-topnav .theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.bk-topnav .share{width:40px;height:40px;border-radius:12px;background:var(--card);border:1px solid var(--border);display:grid;place-items:center;cursor:pointer}
+.bk-topnav .share svg{width:18px;height:18px;stroke:var(--text);stroke-width:2;fill:none}
+@media(max-width:380px){.bk-topnav{padding:8px 10px;gap:6px}.bk-topnav .theme-tg button{padding:6px 9px}}
 .bk-gallery{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .bk-gallery::-webkit-scrollbar{display:none}
 .bk-shot{position:relative;flex:0 0 88%;scroll-snap-align:center;aspect-ratio:16/10;max-height:38vh;background:var(--card-soft);overflow:hidden}
@@ -1543,7 +1553,7 @@ drawer.querySelectorAll('a[data-go]').forEach(function(a){
 document.getElementById('shareBtn').onclick = async function(){
   var url = 'https://bukeame.com/'+state.biz.slug;
   if(navigator.share){ try{ await navigator.share({title:state.biz.name, url:url}); }catch(e){} }
-  else { try{ await navigator.clipboard.writeText(url); alert('Enlace copiado'); }catch(e){} }
+  else { try{ await navigator.clipboard.writeText(url); if(window.bkToast) bkToast('Enlace copiado'); else alert('Enlace copiado'); }catch(e){} }
 };
 
 // ═══════════ FLUJO DE RESERVA (preservado del original) ═══════════
@@ -1609,6 +1619,12 @@ function renderDates(){
   document.getElementById('slotsArea').innerHTML = '<div class="slots-empty">Elige un día para ver las horas disponibles.</div>';
 }
 
+function slotLabel(s){
+  if(!String(s).includes('T')) return s;
+  var d = new Date(s), h = d.getHours(), m = d.getMinutes();
+  return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'am' : 'pm');
+}
+
 async function loadSlots(){
   var area = document.getElementById('slotsArea');
   area.innerHTML = '<div class="slots-empty">Buscando horas disponibles…</div>';
@@ -1634,10 +1650,19 @@ async function loadSlots(){
       if(wb) wb.onclick = waitFromBooking;
       return;
     }
-    area.innerHTML = '<div class="slots">'+slots.map(function(s){
-      var t = s.includes('T') ? new Date(s).toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'}) : s;
-      return '<div class="slot" data-iso="'+esc(s)+'">'+t+'</div>';
-    }).join('')+'</div>';
+    // Agrupadas por parte del día y con la hora corta ("10:00 am"): con el formato largo
+    // ("10:00 a. m.") la hora se partía en dos líneas dentro del botón.
+    var groups = [ { label:'Mañana', items:[] }, { label:'Tarde', items:[] }, { label:'Noche', items:[] } ];
+    slots.forEach(function(s){
+      var d = s.includes('T') ? new Date(s) : null;
+      var h = d ? d.getHours() : parseInt(String(s).split(':')[0], 10);
+      groups[h < 12 ? 0 : (h < 17 ? 1 : 2)].items.push(s);
+    });
+    area.innerHTML = groups.filter(function(g){ return g.items.length; }).map(function(g){
+      return '<div class="slot-group"><div class="slot-gl">'+g.label+'</div><div class="slots">'+g.items.map(function(s){
+        return '<div class="slot" data-iso="'+esc(s)+'">'+esc(slotLabel(s))+'</div>';
+      }).join('')+'</div></div>';
+    }).join('');
     area.querySelectorAll('.slot').forEach(function(sl){
       sl.onclick = function(){ state.slot = sl.dataset.iso; goToConfirm(); };
     });
@@ -1662,13 +1687,18 @@ function goToConfirm(){
   var svcRows = state.selectedServices.map(function(s){
     return '<div class="row"><span>'+esc(s.name)+'</span><b>'+money(s.price_cents)+'</b></div>';
   }).join('');
+  // Mismo cálculo que el servidor al reservar: suma de los depósitos de los servicios o,
+  // si ninguno tiene, el depósito por defecto del negocio (solo si cobra depósitos).
+  var depSum = state.selectedServices.reduce(function(a,s){ return a+(s.deposit_cents||0); },0);
+  var depNow = depositsOn() ? (depSum || (state.biz && state.biz.deposit_default_cents) || 0) : 0;
   document.getElementById('summary').innerHTML =
     svcRows +
     '<div class="row"><span>Profesional</span><b>'+esc(staffName)+'</b></div>'+
     '<div class="row"><span>Fecha</span><b>'+fecha+'</b></div>'+
     '<div class="row"><span>Hora</span><b>'+hora+'</b></div>'+
     '<div class="row"><span>Duración</span><b>'+fmtDuration(totalMin)+'</b></div>'+
-    '<div class="row tot"><span>Total</span><b>'+money(totalPrice)+'</b></div>';
+    '<div class="row tot"><span>Total</span><b>'+money(totalPrice)+'</b></div>'+
+    (depNow > 0 ? '<div class="row dep-now"><span>Depósito para reservar</span><b>'+money(depNow)+'</b></div>' : '');
   goStep(3);
 }
 
