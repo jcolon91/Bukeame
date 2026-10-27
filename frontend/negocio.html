@@ -152,6 +152,7 @@ html[data-theme="dark"] .hero-logo.no-logo{
 .inforow .ic svg{width:20px;height:20px;stroke:var(--teal-ink);stroke-width:1.8;fill:none}
 .inforow .lbl{color:var(--ink2);min-width:78px}
 .inforow .val{font-weight:600;flex:1}
+.inforow .val.pol-txt{font-weight:500;line-height:1.55}
 .hours-day{display:flex;justify-content:space-between;font-size:14px;padding:8px 0;border-bottom:1px solid var(--line)}
 .hours-day:last-child{border-bottom:0}
 .hours-day.today{font-weight:700;color:var(--teal-ink)}
@@ -238,7 +239,9 @@ html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;
 .success p{font-size:14px;color:var(--ink2);line-height:1.6;margin-bottom:6px}
 .success .code{font-family:var(--mono);font-weight:700;font-size:20px;color:var(--teal-ink);background:var(--teal-soft);display:inline-block;padding:8px 18px;border-radius:12px;margin:12px 0;letter-spacing:.1em}
 
-.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:26px 0 120px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding:26px 0 120px;line-height:2}
+/* los enlaces salían en el azul por defecto del navegador */
+.foot a{color:var(--teal);text-underline-offset:3px}
 
 /* ── Awning (marquesina) ── */
 .awning{height:12px;background:var(--awning)}
@@ -475,7 +478,9 @@ html[data-theme="dark"] .bk-head .bk-logo{background:linear-gradient(140deg,#15A
 .bk-svc .bk-dur{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11.5px;color:var(--muted);font-weight:600}
 .bk-svc .bk-dur svg{width:13px;height:13px;stroke:var(--muted);stroke-width:1.8;fill:none}
 .bk-svc .bk-price{font-family:var(--mono);font-weight:700;font-size:14px;color:var(--green)}
-.bk-svc .bk-dep{font-family:var(--mono);font-size:10.5px;color:var(--muted2)}
+/* El depósito siempre en su línea (antes a veces iba pegado al precio y a veces abajo,
+   según el largo) y con más contraste: con --muted2 casi no se leía en oscuro. */
+.bk-svc .bk-dep{font-family:var(--mono);font-size:10.5px;color:var(--muted);flex-basis:100%}
 .bk-svc .bk-svc-book{flex:none;align-self:center;background:var(--green-soft);color:var(--green);font-weight:700;font-size:13px;padding:10px 16px;border-radius:99px;white-space:nowrap;transition:.15s}
 .bk-svc .bk-svc-book:hover{background:var(--green);color:var(--green-ink)}
 .bk-svc .bk-svc-book:active{transform:scale(.97)}
@@ -1003,7 +1008,10 @@ function setSeo(){
     image: [b.cover_url, b.logo_url].map(absUrl).filter(Boolean),
     telephone: phone ? '+' + phone : undefined,
     address: { '@type': 'PostalAddress', streetAddress: b.address_line || undefined,
-      addressLocality: b.municipality || undefined, addressCountry: 'PR' },
+      addressLocality: b.municipality || undefined,
+      // código postal de PR (006xx–009xx) si viene escrito en la dirección
+      postalCode: ((String(b.address_line || '').match(/\b00[6-9]\d{2}\b/) || [])[0]) || undefined,
+      addressCountry: 'PR' },
     geo: (b.lat != null && b.lng != null) ? { '@type': 'GeoCoordinates', latitude: Number(b.lat), longitude: Number(b.lng) } : undefined,
     priceRange: prices.length ? '$' + Math.round(Math.min.apply(null, prices) / 100) + '–$' + Math.round(Math.max.apply(null, prices) / 100) : undefined,
     currenciesAccepted: 'USD',
@@ -1161,14 +1169,12 @@ function renderProfile(){
   // Políticas que el negocio edita (business.policies = array de strings)
   if(Array.isArray(b.policies)){
     var items = b.policies.filter(function(p){ return typeof p==='string' && p.trim(); });
+    // Como filas con ícono y línea fina (igual que Cancelación/Depósito), no como lista con
+    // puntos: más fácil de leer y sin viñetas.
     if(items.length){
-      pol.push('<ul style="list-style:none;margin:0 0 4px;padding:0;display:flex;flex-direction:column;gap:9px">'+
-        items.map(function(p){
-          return '<li style="display:flex;align-items:flex-start;gap:9px;font-size:13.5px;line-height:1.55;color:var(--text)">'+
-            '<span style="flex:none;width:6px;height:6px;border-radius:99px;background:var(--green);margin-top:7px"></span>'+
-            '<span>'+esc(p.trim())+'</span></li>';
-        }).join('')+
-      '</ul>');
+      pol.push(items.map(function(p){
+        return '<div class="inforow"><span class="ic">'+ICONS.doc+'</span><span class="val pol-txt">'+esc(p.trim())+'</span></div>';
+      }).join(''));
     }
   }
   if(b.cancellation_hours>0) pol.push('<div class="inforow"><span class="ic">'+ICONS.clock+'</span><span class="lbl" style="min-width:0">Cancelación</span><span class="val">Cancela con al menos '+b.cancellation_hours+' hora'+(b.cancellation_hours>1?'s':'')+' de anticipación.</span></div>');

@@ -90,6 +90,20 @@ main{padding:22px 20px 90px;max-width:760px;min-width:0}
 .kpi{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
 .kpi small{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .kpi b{display:block;font-family:var(--display);font-weight:800;font-size:24px;margin-top:4px;letter-spacing:-.02em}
+/* Celular: el encabezado de la agenda estaba apretado (nombre, selectores, campana y
+   "+ Cita manual" peleando el mismo espacio). Ahora: nombre y fecha a todo el ancho;
+   debajo la campana y "+ Cita manual" (lo principal); al final Claro/Oscuro y ES/EN.
+   Las cuatro cifras del día, más compactas. */
+@media(max-width:560px){
+  #view-agenda .tophead{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:16px}
+  #view-agenda .tophead > div:last-child{width:100%;gap:8px!important}
+  #view-agenda .tophead .bell{order:1;flex:none}
+  #addApptBtn{order:2;flex:1 1 calc(100% - 60px);justify-content:center;min-height:40px}
+  #view-agenda .tophead .theme-tg{order:3}
+  .kpis{gap:8px;margin-bottom:16px}
+  .kpi{padding:10px 12px;border-radius:14px}
+  .kpi b{font-size:20px;margin-top:2px}
+}
 .view{display:none}.view.on{display:block}
 .period-btn{background:var(--card);border:1.5px solid var(--border);color:var(--muted);font-weight:600}
 .period-btn.on{background:var(--green);color:var(--green-ink);border-color:var(--green)}
@@ -2526,13 +2540,10 @@ function buildDayTimeline(list, items, staff){
   const bodyH = (totalMin/60)*PXH;
   const COLW = 168, GUT = 56, HEADH = 44;
 
-  // Leyenda.
-  let legend = '<div class="tl-legend">'+ staff.map(function(s,i){
-    return '<span class="tl-leg"><i style="background:'+esc(colorById[s.id])+'"></i>'+esc(s.display_name||'—')+'</span>';
-  }).join('') +'</div>';
-
+  // Sin leyenda en el día: el encabezado de cada columna ya dice el nombre y su color
+  // (salían repetidos dos veces seguidas).
   // Rejilla: gutter + 1 columna por profesional.
-  let h = legend +
+  let h =
     // Las columnas llenan el ancho (mínimo COLW; en celular sigue el scroll de lado):
     // con ancho fijo, en computadora sobraba media pantalla y el servicio salía cortado.
     '<div class="tl-scroll"><div class="tl-grid" style="grid-template-columns:'+GUT+'px repeat('+staff.length+',minmax('+COLW+'px,1fr));grid-template-rows:'+HEADH+'px '+bodyH+'px">';

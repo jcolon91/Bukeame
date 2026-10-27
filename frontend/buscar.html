@@ -427,8 +427,11 @@ function renderPortada(d){
   d = d || {};
   const featured = d.featured || [];
   const nearby = d.nearby || [];
-  const top = d.top_rated || [];
-  const recent = d.recent || [];
+  // "Mejor calificados" solo con negocios que SÍ tienen reseñas (antes salían todos como
+  // "Nuevo"), y "Recién llegados" sin repetir los que ya salieron arriba.
+  const top = (d.top_rated || []).filter(b => Number(b.rating_count) > 0);
+  const shown = new Set(top.map(b => b.slug));
+  const recent = (d.recent || []).filter(b => !shown.has(b.slug));
   const promoted = Array.isArray(d.promoted) ? d.promoted.filter(b=>b && b.slug && b.campaign_id) : [];
   const P = document.getElementById('portada');
   let html = '';
@@ -449,7 +452,7 @@ function renderPortada(d){
       '<div class="hscroll">'+nearby.map(b=>mcard(b,{dist:true})).join('')+'</div></div>';
   }
   if(top.length){
-    html += '<div class="section"><div class="head"><h2>Mejor calificados</h2><span class="sub">★</span></div>'+
+    html += '<div class="section"><div class="head"><h2>Mejor calificados</h2></div>'+
       '<div class="grid">'+top.map(b=>mcard(b)).join('')+'</div></div>';
   }
   if(recent.length){
