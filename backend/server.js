@@ -4471,6 +4471,8 @@ try {
   require('./module-platform-billing').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   adsMod = require('./module-ads');
   adsMod.mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  // Recepcionista IA por teléfono (Retell). Inerte sin RETELL_VOZ_KEY en el .env.
+  require('./module-voz').mount(app, { db, h: sharedHelpers, port: PORT });
 } catch (e) {
   console.error('⚠ Error montando módulos v1.1:', e.message);
 }
