@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+# Paneles con sesión: no aportan nada en Google.
+Disallow: /panel.html
+Disallow: /admin.html
+Disallow: /cliente.html
+Disallow: /ajustes.html
+Disallow: /espera.html
+# /api/public/ NO se bloquea: Google lo necesita para ver los datos de cada negocio.
+
+Sitemap: https://bukeame.com/sitemap.xml

@@ -2137,7 +2137,13 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
             b.policies,
             m.name AS municipality,
             ${SQL_DEPOSITS_OK} AS deposits_enabled,
-            ${SQL_BRANDING_OK} AS branding_ok
+            ${SQL_BRANDING_OK} AS branding_ok,
+            -- mismo criterio que POST /api/public/:slug/waitlist (si no, el botón lleva a un 404)
+            COALESCE((p.features->>'waitlist')::boolean, false) AS waitlist_enabled,
+            -- para el tipo de negocio en los datos estructurados de Google (BarberShop, HairSalon…)
+            (SELECT COALESCE(json_agg(c.slug ORDER BY c.sort_order), '[]'::json)
+               FROM business_categories bc JOIN categories c ON c.id = bc.category_id
+              WHERE bc.business_id = b.id) AS categories
        FROM businesses b
        LEFT JOIN pr_municipalities m ON m.id = b.municipality_id
        JOIN subscriptions s ON s.business_id = b.id
@@ -3597,7 +3603,9 @@ function buildMessage(template, ctx) {
       // Mensajes viejos (sin cita ligada) no traen el enlace de la oferta: mandan a reservar.
       return `⚡ *${biz.name} — ¡se liberó un turno!*\n`
         + (appt?.starts_at ? `\n💈 ${appt.service_name}\n🗓 ${when}\n` : '')
-        + `\nTienes *30 minutos* para tomarlo antes de que pase al siguiente en la lista.\n\n`
+        + (ctx.offerMinutes
+          ? `\nTienes *${ctx.offerMinutes} ${ctx.offerMinutes === 1 ? 'minuto' : 'minutos'}* para tomarlo antes de que pase al siguiente en la lista.\n\n`
+          : `\nTómalo rápido: si no, pasa al siguiente en la lista.\n\n`)
         + (ctx.offerUrl ? `Tómalo aquí: ${ctx.offerUrl}` : `Reserva aquí: ${bookUrl(biz.slug)}`);
     case 'due_reminder':
       return `👋 *${biz.name}*\n¿Listo para tu próxima visita? Ya va siendo hora.\n\nReserva tu turno cuando quieras — aquí mismo. 💈`;
@@ -4025,12 +4033,12 @@ async function dispatchBatch() {
     `SELECT m.id, m.channel, m.recipient, m.template, m.appointment_id, ${MSG_V2 ? 'm.attempts' : '0 AS attempts'},
             a.starts_at, a.service_name, a.confirmation_code, a.status, a.deposit_cents,
             b.name, b.slug, b.whatsapp, b.phone, b.ath_phone, b.address_line, b.lat, b.lng,
-            w.id AS waitlist_id
+            w.id AS waitlist_id, w.offer_expires_at
        FROM message_log m
        LEFT JOIN appointments a ON a.id = m.appointment_id
        JOIN businesses b ON b.id = m.business_id
        LEFT JOIN LATERAL (
-         SELECT wl.id FROM waitlist wl JOIN clients c ON c.id = wl.client_id
+         SELECT wl.id, wl.offer_expires_at FROM waitlist wl JOIN clients c ON c.id = wl.client_id
           WHERE m.template = 'waitlist_offer' AND wl.offered_appointment_id = m.appointment_id
             AND wl.offer_state = 'offered' AND wl.offer_expires_at > now() AND c.phone = m.recipient
           LIMIT 1) w ON true
@@ -4059,6 +4067,8 @@ async function dispatchBatch() {
              address_line: m.address_line, lat: m.lat, lng: m.lng },
       appt: m,
       offerUrl: m.waitlist_id ? `${SITE_URL}/oferta.html?id=${m.waitlist_id}` : null,
+      // minutos que de verdad le quedan (el negocio escoge el tiempo; la cola tarda unos segundos)
+      offerMinutes: m.offer_expires_at ? Math.max(1, Math.round((new Date(m.offer_expires_at) - Date.now()) / 60_000)) : null,
     };
     if (m.series) ctx.series = m.series;
     try {
@@ -4157,6 +4167,32 @@ setTimeout(() => {
   watchdogAvisos().catch(e => console.error('vigilante:', e.message));
   setInterval(() => { watchdogAvisos().catch(e => console.error('vigilante:', e.message)); }, 15 * 60_000);
 }, 2 * 60_000);
+
+// ── Mapa del sitio para Google (frontend/sitemap.xml) ───────────────────────
+// nginx sirve el frontend como archivos, así que el server lo escribe ahí al arrancar y
+// cada 6 h: la portada, el buscador, las páginas públicas y la de cada negocio con
+// servicios (bukeame.com/<slug>). frontend/robots.txt lo anuncia. Las direcciones son
+// las mismas de cada <link rel="canonical">. Sin la carpeta (pruebas), no hace nada.
+const SITEMAP_FILE = path.join(__dirname, '..', 'frontend', 'sitemap.xml');
+const SITEMAP_PAGES = ['index.html', 'buscar.html', 'faq-clientes.html', 'faq-negocios.html', 'terminos.html', 'privacidad.html'];
+async function writeSitemap() {
+  if (!fs.existsSync(path.dirname(SITEMAP_FILE))) return;
+  const { rows } = await db.query(
+    `SELECT b.slug, b.updated_at FROM businesses b
+      WHERE b.deleted_at IS NULL AND b.is_published   -- respeta "Aparecer en el buscador"
+        AND EXISTS (SELECT 1 FROM services s WHERE s.business_id = b.id AND s.is_active AND s.deleted_at IS NULL)
+      ORDER BY b.created_at`);
+  const url = (loc, extra = '') => `  <url><loc>${loc}</loc>${extra}</url>`;
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    + SITEMAP_PAGES.map(p => url(`${SITE_URL}/${p}`)).join('\n') + '\n'
+    + rows.map(r => url(`${SITE_URL}/${encodeURIComponent(r.slug)}`,
+        `<lastmod>${new Date(r.updated_at).toISOString().slice(0, 10)}</lastmod>`)).join('\n')
+    + '\n</urlset>\n';
+  fs.writeFileSync(SITEMAP_FILE + '.tmp', xml);
+  fs.renameSync(SITEMAP_FILE + '.tmp', SITEMAP_FILE);   // nunca queda a medias si nginx lo lee
+}
+writeSitemap().catch(e => console.error('sitemap:', e.message));
+setInterval(() => { writeSitemap().catch(e => console.error('sitemap:', e.message)); }, 6 * 3600_000);
 
 // ── Worker: ciclo de vida del cobro ────────────────────────────────────────
 // El beneficio (add-on / plan de pago) se mantiene durante el período pagado +

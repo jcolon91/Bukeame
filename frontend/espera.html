@@ -52,7 +52,11 @@ html[data-theme="dark"] .wl .offered{background:rgba(239,161,47,.18);color:#EFB8
 .locked h2{font-family:var(--display);font-weight:800;font-size:23px;letter-spacing:-.02em;margin-bottom:8px}
 .locked p{font-size:14px;opacity:.92;line-height:1.55;margin-bottom:20px}
 .locked a{display:inline-block;background:var(--card);color:var(--green);font-weight:700;font-size:14px;padding:13px 24px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
-.info{background:var(--green-soft);border:1px solid var(--border);border-radius:16px;padding:15px 17px;font-size:13px;color:var(--green);line-height:1.5;margin-bottom:20px}
+.info{background:var(--green-soft);border:1px solid var(--border);border-radius:16px;padding:15px 17px;font-size:13px;color:var(--green);line-height:1.5;margin-bottom:12px}
+.setrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:20px;font-size:13.5px}
+.setrow label{flex:1;min-width:180px;font-weight:600}
+.setrow select{font:inherit;padding:8px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text)}
+.setrow .msg{font-size:12px;color:var(--muted);width:100%}
 .foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
 </style>
 <script src="bukeame-core.js"></script>
@@ -107,17 +111,33 @@ async function load(){
     return;
   }
   const list=(r.data.waitlist)?r.data.waitlist:(Array.isArray(r.data)?r.data:[]);
-  content.innerHTML='<div class="info">Cuando se cancela una cita, Bukéame le ofrece ese turno por WhatsApp al primero de la lista que le sirva. Tiene 30 minutos para tomarlo; si no, pasa al siguiente.</div>';
-  if(list.length===0){
-    content.innerHTML+='<div class="empty">No hay nadie en lista de espera.<br>Cuando tu agenda se llene, los clientes podrán anotarse.</div>';
-    return;
-  }
-  content.innerHTML+=list.map(function(w,i){
-    const offered=w.offer_state==='offered'?'<span class="offered">Turno ofrecido</span>':'';
-    return '<div class="wl"><div class="pos">'+(w.position||i+1)+'</div><div class="grow"><h4>'+esc(w.full_name||'Cliente')+' '+offered+'</h4><p>'+(w.service_name?esc(w.service_name):'Cualquier servicio')+(w.staff_name?(' · '+esc(w.staff_name)):'')+'</p></div><button class="del" data-id="'+esc(w.id)+'">Quitar</button></div>';
-  }).join('');
+  const mins=r.data.offer_minutes||15;
+  const opts=[10,15,20,30,45,60]; if(opts.indexOf(mins)<0) opts.push(mins); opts.sort(function(a,b){return a-b;});
+  // Todo el HTML de una vez y los botones al final (con innerHTML+= se pierden los onclick).
+  content.innerHTML='<div class="info">Cuando se cancela una cita, Bukéame le ofrece ese turno por WhatsApp al primero de la lista que le sirva. Tiene <b id="minsTxt">'+mins+' minutos</b> para tomarlo; si no, pasa al siguiente.</div>'
+    +'<div class="setrow"><label for="offerMins">Tiempo para tomar un turno</label><select id="offerMins">'
+    +opts.map(function(m){ return '<option value="'+m+'"'+(m===mins?' selected':'')+'>'+m+' minutos</option>'; }).join('')
+    +'</select><span class="msg" id="minsMsg"></span></div>'
+    +(list.length===0
+      ? '<div class="empty">No hay nadie en lista de espera.<br>Cuando tu agenda se llene, los clientes podrán anotarse.</div>'
+      : list.map(function(w,i){
+          const offered=w.offer_state==='offered'?'<span class="offered">Turno ofrecido</span>':'';
+          return '<div class="wl"><div class="pos">'+(w.position||i+1)+'</div><div class="grow"><h4>'+esc(w.full_name||'Cliente')+' '+offered+'</h4><p>'+(w.service_name?esc(w.service_name):'Cualquier servicio')+(w.staff_name?(' · '+esc(w.staff_name)):'')+'</p></div><button class="del" data-id="'+esc(w.id)+'">Quitar</button></div>';
+        }).join(''));
+  let savedMins=mins;
+  document.getElementById('offerMins').onchange=async function(){
+    const sel=this, v=parseInt(sel.value,10), msg=document.getElementById('minsMsg');
+    msg.textContent='Guardando…';
+    const s=await api('PUT','/waitlist/settings',{offer_minutes:v});
+    if(s.ok){ savedMins=v; msg.textContent='Guardado. Aplica a los próximos turnos que se liberen.'; document.getElementById('minsTxt').textContent=v+' minutos'; }
+    else { sel.value=String(savedMins); msg.textContent=(s.data&&s.data.error)||'No se pudo guardar.'; }   // vuelve a lo guardado
+  };
+  // Doble toque en vez de confirm(): en la app instalada el confirm() no sale y el botón no hacía nada.
   content.querySelectorAll('.del').forEach(function(b){
-    b.onclick=async function(){ if(!confirm('¿Quitar de la lista?'))return; const r=await api('DELETE','/waitlist/'+b.dataset.id); if(r.ok)load(); };
+    b.onclick=async function(){
+      if(b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='¿Seguro? Toca otra vez'; setTimeout(function(){ b.dataset.armed=''; b.textContent='Quitar'; }, 4000); return; }
+      b.disabled=true; const r=await api('DELETE','/waitlist/'+b.dataset.id); if(r.ok) load(); else { b.disabled=false; b.textContent='Quitar'; }
+    };
   });
 }
 load();

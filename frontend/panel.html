@@ -668,6 +668,21 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
             <a id="embedLink" class="btn btn-sm" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" href="developers.html" target="_blank" rel="noopener">Ver código e instrucciones</a>
           </div>
           <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px">
+            <div style="font-size:17px;font-weight:700;color:var(--ink);margin:0 0 6px">Botón "Reservar" en Google</div>
+            <p style="font-size:13px;color:var(--ink2);margin:0 0 12px">Que cuando te busquen en Google o en Maps, el botón de reservar lleve directo a tu página de Bukéame.</p>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+              <input id="gLink" readonly style="flex:1;min-width:0;font:inherit;font-size:13px;padding:9px 11px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg2);color:var(--ink)">
+              <button id="gCopy" type="button" class="btn btn-teal btn-sm">Copiar</button>
+            </div>
+            <ol id="gSteps" style="font-size:12.5px;color:var(--ink2);margin:0 0 8px;padding-left:18px;line-height:1.6">
+              <li>Con la cuenta de Google de tu negocio, busca el nombre del negocio en Google.</li>
+              <li>Toca <strong>Editar perfil</strong> → <strong>Reservas</strong> → <strong>Agregar enlace</strong>.</li>
+              <li>Pega tu enlace, márcalo como <strong>preferido</strong> y guarda. Google puede tardar unos días en mostrar el botón.</li>
+            </ol>
+            <p style="font-size:12px;color:var(--ink2);margin:0 0 6px">El enlace abre tu página ya en el paso de reservar.</p>
+            <p style="font-size:12px;color:var(--ink2);margin:0">¿No tienes perfil en Google? Créalo gratis en <a href="https://business.google.com" target="_blank" rel="noopener" style="color:var(--green)">business.google.com</a>.</p>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px">
             <div style="font-size:17px;font-weight:700;color:var(--ink);margin:0 0 6px">Promociones y destacar</div>
             <p style="font-size:13px;color:var(--ink2);margin:0 0 14px">Sal arriba en el buscador y el inicio con anuncios pagados por vista/clic, con tu presupuesto.</p>
             <button class="btn btn-sm" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" type="button" onclick="switchView('promos')">Ir a Promociones</button>
@@ -2069,6 +2084,17 @@ function fillBusiness(data){
   if (kitLink) kitLink.href = 'kit-marca.html?nombre=' + encodeURIComponent(b.name || '') + '&slug=' + encodeURIComponent(b.slug || '') + '&url=' + encodeURIComponent('bukeame.com/' + (b.slug || '')) + '&tel=' + encodeURIComponent(b.whatsapp || b.phone || '') + (b.logo_url ? '&logo=' + encodeURIComponent(b.logo_url) : '');
   var embedLink = document.getElementById('embedLink');
   if (embedLink) embedLink.href = 'developers.html?slug=' + encodeURIComponent(b.slug || '');
+  // Enlace para el botón "Reservar" del perfil de Google (la página bonita: bukeame.com/<slug>)
+  var gLink = document.getElementById('gLink');
+  if (gLink) {
+    // reservar=1 abre la reserva de una vez; utm_* para contar cuántos llegan desde Google
+    gLink.value = 'https://bukeame.com/' + (b.slug || '') + '?reservar=1&utm_source=google&utm_medium=perfil&utm_campaign=reservar';
+    document.getElementById('gCopy').onclick = function () {
+      var btn = this, done = function () { btn.textContent = 'Copiado'; setTimeout(function () { btn.textContent = 'Copiar'; }, 1800); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(gLink.value).then(done, function () { gLink.select(); document.execCommand('copy'); done(); });
+      else { gLink.select(); document.execCommand('copy'); done(); }
+    };
+  }
   document.getElementById('bizAddr').value = b.address_line || '';
   document.getElementById('bizAth').value = b.ath_phone || '';
   // Factura/recibo personalizado del negocio (lo que le llega al cliente).

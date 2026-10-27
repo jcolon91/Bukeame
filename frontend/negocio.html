@@ -4,13 +4,13 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reservar — Bukéame</title>
 <meta name="description" content="Reserva tu cita en línea en segundos: elige servicio, profesional, día y hora. Compra productos, gift cards y únete a la lista de espera con Bukéame.">
-<link rel="canonical" href="https://bukeame.com/negocio.html">
+<!-- Sin canonical fijo: era el mismo para TODOS los negocios (Google los veía como copias
+     de negocio.html). setSeo() pone el de cada negocio: https://bukeame.com/<slug>. -->
 <meta name="theme-color" content="#0E8074">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%230E8074'/%3E%3Ctext x='32' y='44' font-family='Arial,sans-serif' font-size='38' font-weight='bold' text-anchor='middle' fill='white'%3EB%3C/text%3E%3C/svg%3E">
 <meta property="og:title" content="Reservar — Bukéame">
 <meta property="og:description" content="Reserva tu cita en línea en segundos: elige servicio, profesional, día y hora. Compra productos, gift cards y más con Bukéame.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://bukeame.com/negocio.html">
 <meta property="og:site_name" content="Bukéame">
 <meta property="og:locale" content="es_PR">
 <meta property="og:image" content="https://bukeame.com/og-cover.png">
@@ -192,6 +192,7 @@ html[data-theme="dark"] .hero-logo.no-logo{
 .slot:hover{border-color:var(--teal)}
 .slot.sel{border-color:var(--green);background:var(--green);color:var(--green-ink)}
 .slots-empty{text-align:center;color:var(--ink2);font-size:13.5px;padding:24px;background:var(--card);border:1px dashed var(--line);border-radius:14px;line-height:1.6}
+.btn-wait-day{margin-top:12px;font:inherit;font-weight:700;font-size:13.5px;color:var(--teal);background:var(--teal-soft);border:1.5px solid var(--teal);border-radius:12px;padding:10px 14px;cursor:pointer}
 
 .field{margin-bottom:14px}
 .field label{display:block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px}
@@ -922,17 +923,97 @@ async function boot(){
     state.payment_config = data.payment_config||{};
     state.products = data.products||[];
     state.gallery = data.gallery||[];
+    try{ setSeo(); }catch(e){ if(window.bkCaptureError) window.bkCaptureError(e, {where:'negocio.setSeo', slug:SLUG}); }
     renderProfile();
     renderServices();
     renderGallery();
     renderShop();
+    renderMore();
     document.getElementById('boot').style.display='none';
     document.getElementById('page').style.display='block';
+    // ?reservar=1 (el botón "Reservar" del perfil de Google): abre la reserva de una vez. Se
+    // quita de la dirección para que un reload (al terminar o al volver de pagar) no la reabra.
+    var qs = new URLSearchParams(location.search);
+    if(qs.get('reservar') === '1' && state.services.length){
+      qs.delete('reservar');
+      try{ history.replaceState(history.state, '', location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash); }catch(e){}
+      openBook();
+    }
   }catch(e){
     if(window.bkErrorInto){ window.bkErrorInto(bootEl, 'No se pudo cargar el negocio. Revisa tu conexión.', boot); }
     else { bootEl.textContent='Error de conexión.'; }
     if(window.bkCaptureError) window.bkCaptureError(e, {where:'negocio.boot', slug:SLUG});
   }
+}
+
+// ── Google: título, descripción, dirección oficial y datos estructurados de ESTE negocio ──
+// Google ejecuta el JavaScript al indexar, así que esto le llega aunque el HTML base sea
+// el mismo para todos. (Las vistas previas de WhatsApp/Instagram NO corren JS: esas
+// siguen mostrando lo genérico.) schema.org: https://developers.google.com/search/docs/appearance/structured-data/local-business
+// schema.org no tiene tipo de barbería: Google recomienda el más específico que exista (HairSalon).
+var SCHEMA_TYPE = { barberia:'HairSalon', salon:'HairSalon', unas:'NailSalon', estetica:'BeautySalon', lashes:'BeautySalon',
+  maquillaje:'BeautySalon', waxing:'BeautySalon', spa:'DaySpa', tattoo:'TattooParlor', bienestar:'HealthAndBeautyBusiness',
+  'pet-grooming':'LocalBusiness' };
+// Las fotos se guardan como /uploads/...: Google y las vistas previas necesitan la dirección completa.
+function absUrl(u){ try{ return u ? new URL(u, 'https://bukeame.com').href : ''; }catch(e){ return ''; } }
+var DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function setMeta(attr, key, val){
+  var el = document.head.querySelector('meta['+attr+'="'+key+'"]');
+  if(!el){ el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el); }
+  el.setAttribute('content', val);
+}
+function setSeo(){
+  var b = state.biz || {};
+  var url = 'https://bukeame.com/' + encodeURIComponent(b.slug || SLUG);
+  var where = b.municipality ? (b.municipality + ', Puerto Rico') : 'Puerto Rico';
+  var svcNames = state.services.slice(0, 3).map(function(s){ return s.name; }).join(', ');
+  var title = b.name + ' — ' + (b.municipality || 'Puerto Rico') + ' · Reserva en línea | Bukéame';
+  var desc = (b.bio ? String(b.bio).replace(/\s+/g, ' ').slice(0, 120) + ' · ' : '')
+    + 'Reserva en ' + b.name + ' (' + where + ')' + (svcNames ? ': ' + svcNames : '') + '. Sin llamadas, 24/7.';
+  document.title = title;
+  setMeta('name', 'description', desc.slice(0, 300));
+  setMeta('property', 'og:title', title);
+  setMeta('property', 'og:description', desc.slice(0, 300));
+  setMeta('property', 'og:url', url);
+  if(b.logo_url || b.cover_url) setMeta('property', 'og:image', absUrl(b.cover_url || b.logo_url));
+  var can = document.head.querySelector('link[rel="canonical"]');
+  if(!can){ can = document.createElement('link'); can.rel = 'canonical'; document.head.appendChild(can); }
+  can.href = url;
+
+  var cats = Array.isArray(b.categories) ? b.categories : [];
+  var type = 'HealthAndBeautyBusiness';
+  for(var i = 0; i < cats.length; i++){ if(SCHEMA_TYPE[cats[i]]){ type = SCHEMA_TYPE[cats[i]]; break; } }
+  var phone = String(b.phone || b.whatsapp || '').replace(/\D/g, '');
+  if(phone.length === 10) phone = '1' + phone;
+  var prices = state.services.map(function(s){ return s.price_cents; }).filter(function(c){ return c > 0; });
+  var ld = {
+    '@context': 'https://schema.org', '@type': type, '@id': url + '#negocio',
+    name: b.name, url: url,
+    description: b.bio || undefined,
+    image: [b.cover_url, b.logo_url].map(absUrl).filter(Boolean),
+    telephone: phone ? '+' + phone : undefined,
+    address: { '@type': 'PostalAddress', streetAddress: b.address_line || undefined,
+      addressLocality: b.municipality || undefined, addressCountry: 'PR' },
+    geo: (b.lat != null && b.lng != null) ? { '@type': 'GeoCoordinates', latitude: Number(b.lat), longitude: Number(b.lng) } : undefined,
+    priceRange: prices.length ? '$' + Math.round(Math.min.apply(null, prices) / 100) + '–$' + Math.round(Math.max.apply(null, prices) / 100) : undefined,
+    currenciesAccepted: 'USD',
+    openingHoursSpecification: state.hours.map(function(h){
+      return { '@type': 'OpeningHoursSpecification', dayOfWeek: 'https://schema.org/' + DAY_NAMES[h.day_of_week],
+        opens: String(h.opens).slice(0, 5), closes: String(h.closes).slice(0, 5) };
+    }),
+    makesOffer: state.services.slice(0, 30).map(function(s){
+      // sin precio (0) no se publica como "gratis": solo el servicio
+      return { '@type': 'Offer', itemOffered: { '@type': 'Service', name: s.name, description: s.description || undefined },
+        price: s.price_cents > 0 ? (s.price_cents / 100).toFixed(2) : undefined, priceCurrency: s.price_cents > 0 ? 'USD' : undefined };
+    }),
+    sameAs: ['instagram', 'facebook', 'tiktok'].map(function(k){ var v = b.social && b.social[k]; return (v && /^https?:\/\//.test(v)) ? v : null; }).filter(Boolean),
+  };
+  if(Number(b.rating_count) > 0 && Number(b.rating_avg) > 0)
+    ld.aggregateRating = { '@type': 'AggregateRating', ratingValue: Number(b.rating_avg).toFixed(1), reviewCount: Number(b.rating_count), bestRating: 5, worstRating: 1 };
+  Object.keys(ld).forEach(function(k){ if(Array.isArray(ld[k]) && !ld[k].length) delete ld[k]; });   // nada de listas vacías
+  var s = document.getElementById('ldBiz');
+  if(!s){ s = document.createElement('script'); s.type = 'application/ld+json'; s.id = 'ldBiz'; document.head.appendChild(s); }
+  s.textContent = JSON.stringify(ld).replace(/</g, '\\u003c');   // sin cerrar el <script> por accidente
 }
 
 function renderProfile(){
@@ -1540,7 +1621,17 @@ async function loadSlots(){
     var data = await r.json();
     var slots = data.slots||[];
     if(slots.length===0){
-      area.innerHTML = '<div class="slots-empty">No hay horas disponibles ese día.<br>Prueba con otra fecha.</div>';
+      // El botón solo en días que el negocio abre y dentro de su horizonte: un día cerrado
+      // nunca va a liberar un turno.
+      var p = String(state.date || '').split('-').map(Number);
+      var dow = p.length === 3 ? new Date(p[0], p[1] - 1, p[2]).getDay() : -1;
+      var opensThatDay = state.hours.some(function(h){ return Number(h.day_of_week) === dow; });
+      area.innerHTML = '<div class="slots-empty">No hay horas disponibles ese día.<br>Prueba con otra fecha.'
+        + (state.biz && state.biz.waitlist_enabled && !data.reason && opensThatDay
+          ? '<br><button type="button" class="btn-wait-day" id="waitDayBtn">Avísame si se libera un turno ese día</button>' : '')
+        + '</div>';
+      var wb = document.getElementById('waitDayBtn');
+      if(wb) wb.onclick = waitFromBooking;
       return;
     }
     area.innerHTML = '<div class="slots">'+slots.map(function(s){
@@ -1864,6 +1955,17 @@ function parseVariants(v){
   }
   if(typeof v==='object'){ try{ return Object.values(v).filter(Boolean).map(String); }catch(e){} }
   return [];
+}
+
+// "Más opciones": antes solo salía si había tienda, y con ella la lista de espera quedaba
+// escondida en negocios sin productos. Ahora la lista sale si el plan la incluye; la gift
+// card sigue saliendo solo junto a la tienda, como antes.
+function renderMore(){
+  var hasShop = !!(state.products && state.products.length);
+  var hasWait = !!(state.biz && state.biz.waitlist_enabled);
+  document.getElementById('openWait').style.display = hasWait ? '' : 'none';
+  document.getElementById('checkGift').style.display = hasShop ? '' : 'none';
+  if(hasShop || hasWait) document.getElementById('sec-more').style.display = 'block';
 }
 
 function renderShop(){
@@ -2330,7 +2432,9 @@ document.getElementById('giftBtn').onclick = async function(){
 document.getElementById('giftOkClose').onclick = function(){ closeSheet('giftSheet'); };
 
 // ═══════════ LISTA DE ESPERA ═══════════
-document.getElementById('openWait').onclick = function(){
+// pre = { date, serviceId, staffId } cuando viene de un día sin horas en la reserva.
+function openWait(pre){
+  pre = pre || {};
   clearAlert('waitAlert');
   document.getElementById('waitForm').style.display='block';
   document.getElementById('waitOk').style.display='none';
@@ -2339,8 +2443,29 @@ document.getElementById('openWait').onclick = function(){
   ws.innerHTML = '<option value="">Cualquier servicio</option>'+state.services.map(function(s){ return '<option value="'+esc(s.id)+'">'+esc(s.name)+'</option>'; }).join('');
   var wt = document.getElementById('wStaff');
   wt.innerHTML = '<option value="">Cualquier profesional</option>'+state.staff.map(function(s){ return '<option value="'+esc(s.id)+'">'+esc(s.display_name)+'</option>'; }).join('');
+  if(pre.serviceId) ws.value = pre.serviceId;
+  if(pre.staffId) wt.value = pre.staffId;
+  if(pre.date){ document.getElementById('wFrom').value = pre.date; document.getElementById('wTo').value = pre.date; }
   openSheet('waitSheet');
-};
+}
+document.getElementById('openWait').onclick = function(){ openWait(); };
+// Desde un día lleno: cierra la reserva y abre la lista con ese día, servicio y profesional.
+// El cierre de la reserva es el de arriba de la pila de capas (botón atrás): se cambia por
+// uno que cierra la reserva Y abre la lista, y se va atrás una sola vez. Así no hay
+// carreras con el historial, y un doble toque no saca al visitante de la página.
+var waitSwitching = false;
+function waitFromBooking(){
+  if(waitSwitching || !bookModal.classList.contains('on')) return;
+  waitSwitching = true;
+  var pre = { date: state.date,
+    serviceId: state.selectedServices.length === 1 ? state.selectedServices[0].id : '',
+    staffId: state.staffId || '' };
+  __ovStack[__ovStack.length - 1] = function(){
+    closeBookUI();
+    setTimeout(function(){ waitSwitching = false; openWait(pre); }, 0);
+  };
+  ovBack();
+}
 document.getElementById('closeWait').onclick = function(){ closeSheet('waitSheet'); };
 document.getElementById('waitBtn').onclick = async function(){
   clearAlert('waitAlert');

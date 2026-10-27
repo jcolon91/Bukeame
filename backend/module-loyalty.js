@@ -1,6 +1,6 @@
 // ============================================================================
 //  BUKEAME API — módulo B: FIDELIZACIÓN
-//  Lealtad · Te-toca · Lista de espera (oferta 30min) · Control manual barbero
+//  Lealtad · Te-toca · Lista de espera (oferta con tiempo límite) · Control manual barbero
 // ----------------------------------------------------------------------------
 //  Se ENCHUFA al server.js base:
 //    const loyalty = require('./module-loyalty');
@@ -9,6 +9,16 @@
 // ============================================================================
 
 const crypto = require('crypto');
+
+// Minutos que tiene el cliente para tomar un turno liberado (configurable por negocio,
+// migración 34). Sin la migración, vale el default.
+const DEFAULT_OFFER_MIN = 15;
+async function offerMinutes(db, businessId) {
+  try {
+    const r = await db.query(`SELECT waitlist_offer_minutes AS m FROM businesses WHERE id = $1`, [businessId]);
+    return r.rows[0]?.m || DEFAULT_OFFER_MIN;
+  } catch (_e) { return DEFAULT_OFFER_MIN; }
+}
 
 module.exports.mount = function (app, ctx) {
   const { db, authRequired, businessScope, h } = ctx;
@@ -207,6 +217,19 @@ module.exports.mount = function (app, ctx) {
     });
   }));
 
+  // negocio: cuántos minutos tiene el cliente para tomar un turno que se liberó
+  app.put('/api/waitlist/settings', authRequired, businessScope, asyncH(async (req, res) => {
+    const m = Number(req.body?.offer_minutes);
+    if (!Number.isInteger(m) || m < 5 || m > 120) return bad(res, 'Escoge entre 5 y 120 minutos');
+    try {
+      await db.query(`UPDATE businesses SET waitlist_offer_minutes = $1 WHERE id = $2`, [m, req.business.id]);
+    } catch (e) {
+      console.error('waitlist settings (¿falta la migración 34?):', e.message);
+      return bad(res, 'Esta opción todavía no está disponible. Intenta más tarde.', 409);
+    }
+    res.json({ ok: true, offer_minutes: m });
+  }));
+
   // negocio: ver lista de espera del día / rango (panel)
   app.get('/api/waitlist', authRequired, businessScope, asyncH(async (req, res) => {
     const { rows } = await db.query(
@@ -221,7 +244,7 @@ module.exports.mount = function (app, ctx) {
          LEFT JOIN staff st ON st.id = w.staff_id
         WHERE w.business_id = $1 AND w.status IN ('waiting','offered')
         ORDER BY w.position`, [req.business.id]);
-    res.json({ waitlist: rows });
+    res.json({ waitlist: rows, offer_minutes: await offerMinutes(db, req.business.id) });
   }));
 
   app.delete('/api/waitlist/:id', authRequired, businessScope, asyncH(async (req, res) => {
@@ -489,7 +512,7 @@ module.exports.mount = function (app, ctx) {
 };
 
 // ============================================================================
-//  WORKERS — ofertas de lista de espera (30 min) y recordatorio te-toca
+//  WORKERS — ofertas de lista de espera (tiempo límite por negocio) y recordatorio te-toca
 // ============================================================================
 module.exports.startWorkers = function (ctx) {
   const { db } = ctx;
@@ -502,7 +525,10 @@ module.exports.startWorkers = function (ctx) {
   // quien ya tiene otra oferta abierta, ni a quien ya se le ofreció este mismo cupo.
   async function offerSlot(slot) {
     const startMs = new Date(slot.starts_at).getTime();
-    if (startMs < Date.now() + 45 * 60_000) return;
+    const minutes = await offerMinutes(db, slot.business_id);
+    // Mínimo fijo de 25 min: con poco margen el tiempo de la oferta se acorta (vence 15 min
+    // antes de la cita) en vez de no ofrecer el turno.
+    if (startMs < Date.now() + 25 * 60_000) return;
     const ok = await db.query(
       `SELECT
          EXISTS (SELECT 1 FROM businesses b JOIN subscriptions s ON s.business_id = b.id
@@ -535,8 +561,8 @@ module.exports.startWorkers = function (ctx) {
       [slot.business_id, slotDate, slot.service_id, slot.staff_id, slot.id, slot.client_id]);
     const w = cand.rows[0];
     if (!w) return;
-    // 30 min para tomarlo, sin pasarse de 15 min antes de la cita.
-    const expires = new Date(Math.min(Date.now() + 30 * 60_000, startMs - 15 * 60_000));
+    // Los minutos del negocio para tomarlo, sin pasarse de 15 min antes de la cita.
+    const expires = new Date(Math.min(Date.now() + minutes * 60_000, startMs - 15 * 60_000));
     const upd = await db.query(
       `UPDATE waitlist SET offer_state = 'offered', offered_appointment_id = $2,
               offered_at = now(), offer_expires_at = $3
@@ -598,16 +624,21 @@ module.exports.startWorkers = function (ctx) {
          VALUES ($1,'whatsapp',$2,'due_reminder')`, [r.business_id, r.phone]);
   }
 
-  // Las dos tareas de ofertas nunca corren a la vez (así un cupo no se ofrece doble).
-  let offering = false;
-  const oneAtATime = (fn) => async () => {
-    if (offering) return;
-    offering = true;
-    try { await fn(); } finally { offering = false; }
-  };
-  setInterval(() => { oneAtATime(offerFreedSlots)().catch(e => console.error('offers:', e.message)); }, 30_000);
-  setInterval(() => { oneAtATime(rotateOffers)().catch(e => console.error('rotate:', e.message)); }, 60_000);
+  // Las dos tareas de ofertas nunca corren a la vez (así un cupo no se ofrece doble), pero
+  // van en FILA: la que llega mientras la otra corre, espera y corre después. (Con un
+  // "si está ocupado, sáltate", cada 60 s las dos arrancan juntas y rotateOffers perdía
+  // siempre: las ofertas vencidas nunca pasaban al siguiente.) Una que ya está en fila
+  // no se vuelve a apilar.
+  let chain = Promise.resolve();
+  const inLine = new Set();
+  function runInLine(name, fn) {
+    if (inLine.has(name)) return;
+    inLine.add(name);
+    chain = chain.then(fn).catch(e => console.error(name + ':', e.message)).finally(() => inLine.delete(name));
+  }
+  setInterval(() => runInLine('offers', offerFreedSlots), 30_000);
+  setInterval(() => runInLine('rotate', rotateOffers), 60_000);
   setInterval(() => { dueReminders().catch(e => console.error('due:', e.message)); }, 3600_000); // cada hora
 
-  console.log('  ✓ workers de fidelización activos (ofertas 30min, te-toca)');
+  console.log('  ✓ workers de fidelización activos (ofertas de lista de espera, te-toca)');
 };
