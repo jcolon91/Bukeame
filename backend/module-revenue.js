@@ -187,7 +187,7 @@ module.exports.mount = function (app, ctx) {
     // (migración 17). Mismas columnas que las demás filas de addon_catalog.
     const { rows } = await db.query(
       `SELECT code, name, price_cents, billing, description FROM addon_catalog ORDER BY price_cents`);
-    res.json({ catalog: rows });
+    res.json({ catalog: rows.filter(c => !h.addonVendible || h.addonVendible(c.code)) });
   }));
 
   app.get('/api/addons', authRequired, businessScope, asyncH(async (req, res) => {
@@ -206,6 +206,7 @@ module.exports.mount = function (app, ctx) {
     const studioPlus = planAtLeast(req.business.plan_code, 'studio');
     const catalog = cat.rows
       .filter(c => !ACCOUNTING_ADDON_CODES.includes(c.code))
+      .filter(c => !h.addonVendible || h.addonVendible(c.code))
       .map(c => (c.code === 'payroll' && !studioPlus)
         ? { ...c, locked: true, requires_plan: 'studio', locked_reason: 'Disponible desde el plan Studio' }
         : c);
@@ -220,6 +221,7 @@ module.exports.mount = function (app, ctx) {
     const code = req.params.code;
     const cat = await db.query(`SELECT * FROM addon_catalog WHERE code = $1`, [code]);
     if (!cat.rows[0]) return bad(res, 'Add-on no existe', 404);
+    if (h.addonVendible && !h.addonVendible(code)) return bad(res, 'Ese add-on todavía no está disponible.', 409);
 
     // plan free no puede activar add-ons que dependan de integraciones externas
     if (code === 'custom_domain' && !(req.business.features?.external_integrations))

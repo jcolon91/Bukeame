@@ -95,7 +95,8 @@ module.exports.mount = function (app, ctx) {
   const PUBLIC = `http://127.0.0.1:${port}/api/public`;
   const SITE = () => process.env.VOZ_BASE_URL || 'https://bukeame.com';
   const RETELL = () => process.env.RETELL_API_BASE || 'https://api.retellai.com';
-  const listo = () => !!(process.env.RETELL_VOZ_KEY && process.env.RETELL_API_KEY && process.env.RETELL_AGENT_ID);
+  // Misma regla que decide si el add-on se vende (server.js)
+  const listo = h.vozLista || (() => !!(process.env.RETELL_VOZ_KEY && process.env.RETELL_API_KEY && process.env.RETELL_AGENT_ID));
   const maxSimultaneas = () => Number(process.env.VOZ_MAX_SIMULTANEAS) || 3;
 
   const igual = (a, b) => {

@@ -182,6 +182,8 @@ module.exports.mount = function (app, ctx) {
     const addons = rows
       // Excluir cualquier add-on de contabilidad del negocio (no se ofrece aquí).
       .filter(a => !ACCOUNTING_ADDON_CODES.includes(a.code))
+      // Lo que todavía no se vende (Recepcionista IA sin Retell) solo sale si ya lo tiene.
+      .filter(a => a.is_active || !h.addonVendible || h.addonVendible(a.code))
       .map(a => {
         // Payroll requiere plan Studio o superior: en planes inferiores se marca
         // bloqueado (locked) con el motivo, para que el panel no permita activarlo.

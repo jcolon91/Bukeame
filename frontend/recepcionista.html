@@ -86,6 +86,7 @@ html[data-theme="dark"] .locked{background:linear-gradient(135deg,#2BC56A,#36E27
 .locked p{font-size:14px;opacity:.92;line-height:1.55;margin-bottom:16px}
 .locked .price{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em}
 .locked .price-sub{font-size:13px;opacity:.85;margin:2px 0 20px}
+.locked .soon{display:inline-block;font-weight:700;font-size:13.5px;padding:11px 18px;border-radius:14px;background:rgba(255,255,255,.16)}
 .locked a{display:inline-block;background:var(--card);color:var(--green);font-weight:700;font-size:14px;padding:13px 24px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
 .info{background:var(--green-soft);border:1px solid var(--border);border-radius:16px;padding:15px 17px;font-size:13px;color:var(--green);line-height:1.5;margin-bottom:14px}
 .warnbox{background:var(--warn-bg);color:var(--warn-ink);border-radius:14px;padding:13px 15px;font-size:13px;line-height:1.5;margin-bottom:12px}
@@ -156,7 +157,10 @@ async function load(){
     content.innerHTML=pausa+'<div class="locked"><div class="ic">'+ICON_PHONE+'</div><h2>Que no se te escape una cita</h2>'
       +'<p>Cuando tienes las manos ocupadas, contesta por ti: da precios y horario, busca horas libres y reserva la cita. Lo que no pueda resolver te lo deja por WhatsApp. Siempre le dice al cliente que es una inteligencia artificial.</p>'
       +'<div class="price">'+dinero(S.price_cents)+' al mes</div><div class="price-sub">'+esc(S.usage.minutes_included)+' minutos, unas 60 llamadas</div>'
-      +'<a href="panel.html#cuenta" class="ios-hide-purchase">Activarla en Mi cuenta</a></div>';
+      +(S.ready
+        ? '<a href="panel.html#cuenta" class="ios-hide-purchase">Activarla en Mi cuenta</a>'
+        : '<div class="soon">Muy pronto. Te avisamos cuando puedas activarla.</div>')
+      +'</div>';
     return;
   }
   content.innerHTML=lineaHtml()+usoHtml()+ajustesHtml()+'<div class="card" id="callsCard"><h2>Llamadas</h2><p class="lead">Las últimas 50 que contestó la recepcionista.</p><div id="calls"><div class="empty">Cargando…</div></div></div>';

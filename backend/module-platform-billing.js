@@ -141,6 +141,7 @@ function mount(app, ctx) {
       if (!codesArr.length) fail('Códigos de add-ons inválidos');
       const a = await db.query(`SELECT code, price_cents FROM addon_catalog WHERE code::text = ANY($1::text[])`, [codesArr]);
       if (a.rows.length !== codesArr.length) fail('Algún add-on no existe', 404);
+      if (h.addonVendible && !codesArr.every(c => h.addonVendible(c))) fail('Algún add-on todavía no está disponible', 409);
       montoEsperadoCents = a.rows.reduce((s, r) => s + r.price_cents, 0);
       if (!Number.isInteger(montoEsperadoCents) || montoEsperadoCents <= 0) fail('Estos add-ons no son cobrables');
       refCode = codesArr.join(',');
@@ -165,6 +166,7 @@ function mount(app, ctx) {
       refCode = code.trim();
       const a = await db.query(`SELECT name, price_cents FROM addon_catalog WHERE code = $1`, [refCode]);
       if (!a.rows[0]) fail('Add-on no existe', 404);
+      if (h.addonVendible && !h.addonVendible(refCode)) fail('Ese add-on todavía no está disponible', 409);
       montoEsperadoCents = a.rows[0].price_cents;
       title = a.rows[0].name || 'Add-on';
     } else if (kind === 'featured') {

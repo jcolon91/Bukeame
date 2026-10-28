@@ -4459,7 +4459,12 @@ setInterval(() => { expireUnpaidOrders().catch(e => console.error('expireUnpaidO
 //  MÓDULOS v1.1 (revenue + fidelización)
 //  Se montan ANTES del catch-all 404 para que sus rutas resuelvan.
 // ============================================================================
+// Recepcionista IA: lista solo con las 3 llaves de Retell en el .env. Hasta entonces el
+// add-on NO se vende en el panel (sí lo puede activar el admin para probar).
+const vozLista = () => !!(process.env.RETELL_VOZ_KEY && process.env.RETELL_API_KEY && process.env.RETELL_AGENT_ID);
+const addonVendible = (code) => String(code) !== 'ai_receptionist' || vozLista();
 const sharedHelpers = {
+  vozLista, addonVendible,
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
   sendEmail, emailPlatformReceipt, emailReceipt, emailGiftCard,

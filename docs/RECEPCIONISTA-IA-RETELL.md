@@ -9,6 +9,8 @@ El cliente recibe el mismo WhatsApp de confirmación (o de depósito) que si hub
 
 **Precio:** $39/mes con 150 minutos (unas 60 llamadas). Se cobra como cualquier add-on: ATH desde Mi cuenta, o el admin lo activa.
 
+**No se vende hasta que Retell esté listo:** mientras falte alguna de las 3 llaves en el `.env` (`RETELL_API_KEY`, `RETELL_VOZ_KEY`, `RETELL_AGENT_ID`), el add-on no sale en Mi cuenta, no se puede pedir ni pagar por ATH, y la página dice "Muy pronto". El admin sí lo puede activar para probar. Aparece solo al completar el paso 1 y reiniciar.
+
 **Cómo está hecho:**
 - **Un solo agente plantilla en Retell sirve a todos los negocios.** La cuenta de Retell es de Wifnix y los negocios nunca entran a Retell.
 - **Cada negocio tiene su propio número de Retell.** Bukéame lo compra solo cuando el dueño toca "Activar mi línea".
