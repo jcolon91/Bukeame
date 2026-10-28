@@ -213,6 +213,10 @@ app.post('/api/payments/stripe/webhook',
     return res.json({ received: true });
   })(req, res)).catch(next));
 
+// Recepcionista IA (Retell): Retell firma el cuerpo CRUDO de sus webhooks, así que en
+// /api/voz se guarda una copia (req.rawBody) para verificar la firma. El parser global
+// de abajo ya no vuelve a leer estos pedidos.
+app.use('/api/voz', express.json({ limit: '5mb', verify: (req, _res, buf) => { req.rawBody = buf; } }));
 app.use(express.json({ limit: '1mb' }));
 
 // --- Uploads (logos de negocios) ---
@@ -266,7 +270,18 @@ const privateCors = cors({ origin: corsOrigin, credentials: false });
 app.use((req, res, next) =>
   req.path.startsWith('/api/public') ? publicCors(req, res, next) : privateCors(req, res, next));
 
-app.use(rateLimit({ windowMs: 60_000, max: 1000, standardHeaders: true, legacyHeaders: false }));
+// La recepcionista IA reserva por las mismas rutas públicas, pero desde el propio servidor
+// (127.0.0.1): sin esto TODAS las llamadas de todos los negocios compartirían un solo cubo
+// de rate-limit. Solo se salta con la llave secreta del .env y desde loopback; los topes
+// por llamada (module-voz) y por teléfono (6 reservas activas) siguen aplicando. El secreto
+// se genera al arrancar y nunca sale del proceso.
+const VOZ_INTERNO = crypto.randomBytes(24).toString('hex');
+function vozInterna(req) {
+  const got = String(req.get('x-bukeame-interno') || '');
+  if (got.length !== VOZ_INTERNO.length || !/^(::ffff:)?127\.0\.0\.1$|^::1$/.test(req.ip || '')) return false;
+  return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(VOZ_INTERNO));
+}
+app.use(rateLimit({ windowMs: 60_000, max: 1000, standardHeaders: true, legacyHeaders: false, skip: vozInterna }));
 const authLimiter   = rateLimit({ windowMs: 15 * 60_000, max: 20,  message: { error: 'Demasiados intentos. Espera 15 minutos.' } });
 // Lockout por cuenta: keyed por email (o IP si no hay email) para frenar fuerza bruta dirigida.
 const loginLimiter  = rateLimit({ windowMs: 15 * 60_000, max: 8, keyGenerator: (req) => req.ip + '|' + ((req.body && req.body.email) ? String(req.body.email).toLowerCase().trim() : ''), message: { error: 'Demasiados intentos para esta cuenta. Espera 15 minutos.' } });
@@ -284,12 +299,12 @@ const mfaLimiter = rateLimit({
   skipSuccessfulRequests: true,   // solo cuentan los intentos FALLIDOS (un código correcto no gasta el cubo)
   message: { error: 'Demasiados intentos de código. Espera 15 minutos.' },
 });
-const publicLimiter = rateLimit({ windowMs: 60_000,      max: 60,  message: { error: 'Vas muy rápido. Intenta en un minuto.' } });
+const publicLimiter = rateLimit({ windowMs: 60_000,      max: 60,  skip: vozInterna, message: { error: 'Vas muy rápido. Intenta en un minuto.' } });
 // Endpoints de ticket por código (ver/cancelar/ref ATH): límite duro para que
 // nadie pueda enumerar/brute-forcear códigos de confirmación de otros clientes.
 const codeLimiter   = rateLimit({ windowMs: 60_000,      max: 10,  message: { error: 'Demasiadas consultas. Intenta en un minuto.' } });
 // Creación pública (citas, órdenes, gift cards, lista de espera): anti-spam.
-const bookingLimiter = rateLimit({ windowMs: 60_000,     max: 12,  message: { error: 'Demasiadas solicitudes seguidas. Espera un minuto.' } });
+const bookingLimiter = rateLimit({ windowMs: 60_000,     max: 12,  skip: vozInterna, message: { error: 'Demasiadas solicitudes seguidas. Espera un minuto.' } });
 
 // ----------------------------------------------------------------------------
 // HELPERS
@@ -4471,8 +4486,11 @@ try {
   require('./module-platform-billing').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
   adsMod = require('./module-ads');
   adsMod.mount(app, { db, authRequired, businessScope, h: sharedHelpers });
-  // Recepcionista IA por teléfono (Retell). Inerte sin RETELL_VOZ_KEY en el .env.
-  require('./module-voz').mount(app, { db, h: sharedHelpers, port: PORT });
+  // Recepcionista IA por teléfono (add-on, Retell). Inerte sin RETELL_VOZ_KEY en el .env.
+  const voz = require('./module-voz').mount(app, { db, authRequired, businessScope, h: sharedHelpers, port: PORT, interno: VOZ_INTERNO });
+  setTimeout(() => voz.revisarLineas().catch(e => console.error('voz:', e.message)), 90_000);
+  setInterval(() => { voz.revisarLineas().catch(e => console.error('voz:', e.message)); },
+    Number(process.env.VOZ_REVISAR_MS) || 30 * 60_000);
 } catch (e) {
   console.error('⚠ Error montando módulos v1.1:', e.message);
 }

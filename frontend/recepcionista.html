@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recepcionista IA — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="La recepcionista IA de tu negocio en Bukéame: contesta las llamadas que no coges, da precios y horario, y reserva citas.">
+<meta name="theme-color" content="#0E8074">
+<link rel="canonical" href="https://bukeame.com/recepcionista.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);--warn-ink:#8a5a13;--warn-bg:#FBEFD8;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{color-scheme:dark;
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);--warn-ink:#EFB85C;--warn-bg:rgba(239,161,47,.18);
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .spacer{flex:1}
+.theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px}
+h1{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.025em;margin-bottom:5px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:22px}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}
+.card h2{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.015em;margin-bottom:4px}
+.card .lead{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+.num{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:-.01em;color:var(--green);margin:4px 0 12px}
+.code-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--border)}
+.code-row .grow{flex:1;min-width:0}
+.code-row small{display:block;font-size:12.5px;color:var(--muted);margin-bottom:3px}
+.code-row code{font-family:var(--mono);font-weight:600;font-size:14px;word-break:break-all}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:14px;padding:12px 18px;border-radius:13px;background:var(--green);color:var(--green-ink);transition:filter .15s}
+.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.55;cursor:default}
+.btn-ghost{background:var(--card-soft);color:var(--text);border:1.5px solid var(--border);padding:8px 12px;font-size:12.5px;border-radius:10px}
+.note{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:10px}
+.bar{height:9px;border-radius:99px;background:var(--card-soft);overflow:hidden;margin:10px 0 6px}
+.bar span{display:block;height:100%;background:var(--green);border-radius:99px}
+.bar.full span{background:#C0392B}
+.field{margin-bottom:16px}
+.field>label,.field>.lbl{display:block;font-weight:700;font-size:13.5px;margin-bottom:6px}
+.field .help{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45}
+input[type=text],input[type=tel],textarea,select{width:100%;font:inherit;font-size:14px;padding:11px 12px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text)}
+textarea{resize:vertical;min-height:64px;line-height:1.45}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--green);outline-offset:1px;border-color:transparent}
+.voice-row{display:flex;gap:8px}.voice-row select{flex:1}
+.say{font-size:13px;line-height:1.5;background:var(--green-soft);color:var(--text);border-radius:12px;padding:11px 13px;margin-top:8px}
+.say b{color:var(--green)}
+.field>label.opt{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1.5px solid var(--border);border-radius:12px;margin-bottom:8px;cursor:pointer;font-weight:400}
+.field>label.opt:has(input:checked){border-color:var(--green);background:var(--green-soft)}
+.opt input{margin-top:3px;accent-color:var(--green)}
+.opt b{display:block;font-size:13.5px}.opt span{font-size:12.5px;color:var(--muted)}
+.faq{border:1.5px solid var(--border);border-radius:14px;padding:12px;margin-bottom:10px;background:var(--bg2)}
+.faq input{margin-bottom:8px}
+.faq .del{color:#C0392B;font-size:12px;font-weight:600;margin-top:6px}
+.save-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.save-row .msg{font-size:12.5px;color:var(--muted)}
+.call{padding:13px 0;border-top:1px solid var(--border)}
+.call:first-of-type{border-top:0}
+.call .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.call .when{font-weight:700;font-size:14px}
+.call .meta{font-size:12.5px;color:var(--muted)}
+.call p{font-size:13px;line-height:1.5;margin-top:5px}
+.call audio{width:100%;margin-top:8px}
+.badge{font-size:10.5px;font-weight:700;font-family:var(--mono);letter-spacing:.02em;padding:2px 8px;border-radius:99px;background:var(--card-soft);color:var(--muted)}
+.badge.ok{background:var(--green-soft);color:var(--green)}
+.badge.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.empty{text-align:center;color:var(--muted);font-size:13.5px;padding:26px 10px;line-height:1.6}
+.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,#0E8074,#0A5B52);color:#fff;border-radius:22px;box-shadow:0 12px 36px var(--green-glow)}
+html[data-theme="dark"] .locked{background:linear-gradient(135deg,#2BC56A,#36E27B);color:#08160F}
+.locked .ic{width:54px;height:54px;margin:0 auto 14px;border-radius:16px;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.locked h2{font-family:var(--display);font-weight:800;font-size:23px;letter-spacing:-.02em;margin-bottom:8px}
+.locked p{font-size:14px;opacity:.92;line-height:1.55;margin-bottom:16px}
+.locked .price{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em}
+.locked .price-sub{font-size:13px;opacity:.85;margin:2px 0 20px}
+.locked a{display:inline-block;background:var(--card);color:var(--green);font-weight:700;font-size:14px;padding:13px 24px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.info{background:var(--green-soft);border:1px solid var(--border);border-radius:16px;padding:15px 17px;font-size:13px;color:var(--green);line-height:1.5;margin-bottom:14px}
+.warnbox{background:var(--warn-bg);color:var(--warn-ink);border-radius:14px;padding:13px 15px;font-size:13px;line-height:1.5;margin-bottom:12px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+</style>
+<script src="bukeame-core.js"></script>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav"><a href="panel.html" class="back" aria-label="Volver al panel">←</a><span class="logo">Buk<i>é</i>ame</span><span class="spacer"></span><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap">
+  <h1>Recepcionista IA</h1>
+  <p class="sub">Contesta las llamadas que no coges.</p>
+  <div id="content"></div>
+</div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+const API='/api';
+const token=localStorage.getItem('bukeame_token');
+if(!token){ location.href='acceso.html'; }
+const MAX_FAQ=12;
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const r=await fetch(API+path,opts);
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
+const ICON_PHONE='<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>';
+const ICON_PLAY='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>';
+
+let S=null;   // estado que vino del servidor
+function dinero(c){ return '$'+(Number(c||0)/100).toFixed(0); }
+function fechaCorta(iso){ try{ return new Date(iso).toLocaleDateString('es-PR',{day:'numeric',month:'long'}); }catch(e){ return ''; } }
+function fechaHora(iso){ try{ return new Date(iso).toLocaleString('es-PR',{weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
+function telBonito(t){ const d=String(t||'').replace(/\D/g,'').replace(/^1(?=\d{10}$)/,''); return d.length===10?'('+d.slice(0,3)+') '+d.slice(3,6)+'-'+d.slice(6):(t||'Número privado'); }
+
+async function load(){
+  const r=await api('GET','/voice');
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+  const content=document.getElementById('content');
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(content,'No se pudo cargar la recepcionista IA.',load); }
+    else { content.innerHTML='<div class="empty">No se pudo cargar. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('voice http '+r.status),{where:'recepcionista.load'});
+    return;
+  }
+  S=r.data;
+  if(!S.addon_active){
+    const L=S.line;
+    const pausa=(L.status==='paused'&&L.phone_number)
+      ? '<div class="warnbox">Tu línea '+esc(L.pretty||L.phone_number)+' está en pausa porque venció el add-on. Te la guardamos'
+        +(L.release_at?' hasta el '+esc(fechaCorta(L.release_at)):' 30 días')+'. Mientras tanto, quita el desvío en tu celular marcando <b>##002#</b>, o las llamadas que no cojas no las contesta nadie.</div>'
+      : '';
+    content.innerHTML=pausa+'<div class="locked"><div class="ic">'+ICON_PHONE+'</div><h2>Que no se te escape una cita</h2>'
+      +'<p>Cuando tienes las manos ocupadas, contesta por ti: da precios y horario, busca horas libres y reserva la cita. Lo que no pueda resolver te lo deja por WhatsApp. Siempre le dice al cliente que es una inteligencia artificial.</p>'
+      +'<div class="price">'+dinero(S.price_cents)+' al mes</div><div class="price-sub">'+esc(S.usage.minutes_included)+' minutos, unas 60 llamadas</div>'
+      +'<a href="panel.html#cuenta" class="ios-hide-purchase">Activarla en Mi cuenta</a></div>';
+    return;
+  }
+  content.innerHTML=lineaHtml()+usoHtml()+ajustesHtml()+'<div class="card" id="callsCard"><h2>Llamadas</h2><p class="lead">Las últimas 50 que contestó la recepcionista.</p><div id="calls"><div class="empty">Cargando…</div></div></div>';
+  bindLinea(); bindAjustes(); loadCalls();
+}
+
+// ---------- Línea y desvío ----------
+function lineaHtml(){
+  const L=S.line;
+  if(!S.ready){
+    return '<div class="info">Ya tienes la recepcionista IA. Estamos terminando de preparar las líneas: te avisamos cuando puedas activar la tuya. Mientras tanto, ya puedes dejar listo cómo quieres que conteste.</div>';
+  }
+  if(!L.phone_number){
+    return '<div class="card"><h2>Tu línea</h2><p class="lead">Al activarla te damos un número. Luego haces que tu celular le pase a ese número las llamadas que no contestes.</p>'
+      +'<button class="btn" id="btnLinea" type="button">Activar mi línea</button><p class="note" id="lineaMsg"></p></div>';
+  }
+  const n=L.phone_number;
+  const codes=[
+    ['Si no contestas en 20 segundos','**61*'+n+'*11*20#'],
+    ['Si estás en otra llamada o la rechazas','**67*'+n+'#'],
+    ['Si el teléfono está apagado o sin señal','**62*'+n+'#'],
+    ['Para quitar el desvío','##002#'],
+  ];
+  return '<div class="card"><h2>Tu línea</h2>'
+    +'<div class="num">'+esc(L.pretty||n)+'</div>'
+    +'<p class="lead">En el celular del negocio, marca cada código en el teclado y oprime llamar. Así, las llamadas que no cojas pasan a la recepcionista.</p>'
+    +codes.map(function(c){ return '<div class="code-row"><div class="grow"><small>'+esc(c[0])+'</small><code>'+esc(c[1])+'</code></div><button class="btn-ghost copy" type="button" data-code="'+esc(c[1])+'">Copiar</button></div>'; }).join('')
+    +'<p class="note">Funcionan en Claro, T-Mobile y Liberty. Para probar, llama al negocio desde otro teléfono y no contestes. Si ese número es también tu celular personal, la recepcionista contesta igual las llamadas personales que no cojas.</p></div>';
+}
+function bindLinea(){
+  const b=document.getElementById('btnLinea');
+  if(b) b.onclick=async function(){
+    b.disabled=true; b.textContent='Activando…';
+    const msg=document.getElementById('lineaMsg'); msg.textContent='Esto toma unos segundos.';
+    const r=await api('POST','/voice/line');
+    if(r.ok){ load(); return; }
+    b.disabled=false; b.textContent='Activar mi línea'; msg.textContent=(r.data&&r.data.error)||'No se pudo activar la línea.';
+  };
+  document.querySelectorAll('.copy').forEach(function(el){
+    el.onclick=async function(){
+      try{ await navigator.clipboard.writeText(el.dataset.code); el.textContent='Copiado'; }
+      catch(e){ el.textContent='Cópialo a mano'; }
+      setTimeout(function(){ el.textContent='Copiar'; },2500);
+    };
+  });
+}
+
+// ---------- Minutos del mes ----------
+function usoHtml(){
+  const u=S.usage, pct=Math.min(100,Math.round(100*u.minutes_used/Math.max(1,u.minutes_included)));
+  const lleno=u.minutes_used>=u.minutes_included;
+  const renueva=u.period_end?' el '+fechaCorta(u.period_end):'';
+  return '<div class="card"><h2>Minutos</h2><div class="bar'+(lleno?' full':'')+'"><span style="width:'+pct+'%"></span></div>'
+    +'<p class="note" style="margin-top:0">'+esc(u.minutes_used)+' de '+esc(u.minutes_included)+' minutos usados.'
+    +(lleno?' Se acabaron los minutos: hasta que se renueve tu add-on'+esc(renueva)+', la recepcionista solo toma mensajes.':' Vuelven a empezar cuando se renueva tu add-on'+esc(renueva)+'.')+'</p></div>';
+}
+
+// ---------- Cómo contesta ----------
+function faqRow(q,a){
+  return '<div class="faq"><input type="text" class="fq" maxlength="140" placeholder="Pregunta, por ejemplo: ¿Tienen estacionamiento?" value="'+esc(q)+'">'
+    +'<textarea class="fa" maxlength="400" placeholder="Respuesta, por ejemplo: Sí, hay estacionamiento gratis al lado.">'+esc(a)+'</textarea>'
+    +'<button class="del" type="button">Quitar</button></div>';
+}
+function ajustesHtml(){
+  const st=S.settings;
+  const voz=S.voices&&S.voices.length
+    ? '<div class="field"><label for="vVoz">Voz</label><div class="voice-row"><select id="vVoz"><option value="">La de siempre</option>'
+      +S.voices.map(function(v){ return '<option value="'+esc(v.id)+'"'+(v.id===st.voice_id?' selected':'')+'>'+esc(v.label)+'</option>'; }).join('')
+      +'</select><button class="btn-ghost" id="vPlay" type="button">'+ICON_PLAY+' Escuchar</button></div></div>'
+    : '';
+  return '<div class="card"><h2>Cómo contesta</h2><p class="lead">Los servicios, precios, el equipo y el horario los saca de tu panel en cada llamada. Aquí le dices lo demás.</p>'
+    +voz
+    +'<div class="field"><label for="vSaludo">Saludo</label><input type="text" id="vSaludo" maxlength="160" placeholder="'+esc(st.default_greeting)+'" value="'+esc(st.greeting)+'">'
+    +'<div class="say" id="vSay"></div><p class="help">El aviso de que es una inteligencia artificial y de que la llamada se graba va siempre: en Puerto Rico hace falta el permiso de las dos partes para grabar.</p></div>'
+    +'<div class="field"><span class="lbl">Qué puede hacer</span>'
+    +'<label class="opt"><input type="radio" name="vModo" value="book"'+(st.mode!=='messages'?' checked':'')+'><div><b>Reservar citas y tomar mensajes</b><span>Busca horas libres y reserva. Al cliente le llega el WhatsApp de siempre.</span></div></label>'
+    +'<label class="opt"><input type="radio" name="vModo" value="messages"'+(st.mode==='messages'?' checked':'')+'><div><b>Solo tomar mensajes</b><span>Da información y te deja por WhatsApp quién llamó y qué quería.</span></div></label></div>'
+    +'<div class="field"><label for="vTransfer">Pasar la llamada a una persona (opcional)</label><input type="tel" id="vTransfer" inputmode="tel" placeholder="787 555 0100" value="'+esc(st.transfer_number)+'">'
+    +'<p class="help">Si el cliente pide hablar con alguien, la recepcionista le pasa la llamada a este número. No pongas el teléfono del negocio: la llamada daría vueltas. Si lo dejas vacío, te deja un mensaje.</p></div>'
+    +'<div class="field"><label for="vApodos">Cómo le dicen tus clientes a tus servicios (opcional)</label><textarea id="vApodos" maxlength="600" placeholder="fade = Corte; recorte = Corte; arreglo = Barba">'+esc(st.aliases)+'</textarea></div>'
+    +'<div class="field"><span class="lbl">Preguntas frecuentes</span><p class="help" style="margin:0 0 8px">Lo que más te preguntan por teléfono y cómo quieres que lo conteste. Hasta '+MAX_FAQ+'.</p>'
+    +'<div id="faqs">'+(st.faq.length?st.faq.map(function(x){ return faqRow(x.q,x.a); }).join(''):faqRow('',''))+'</div>'
+    +'<button class="btn-ghost" id="faqAdd" type="button">Añadir pregunta</button></div>'
+    +'<div class="save-row"><button class="btn" id="vGuardar" type="button">Guardar</button><span class="msg" id="vMsg"></span></div></div>';
+}
+function bindAjustes(){
+  const st=S.settings;
+  const saludo=document.getElementById('vSaludo'), say=document.getElementById('vSay');
+  function pintarSaludo(){ say.innerHTML='La recepcionista dice: <b>'+esc((saludo.value.trim()||st.default_greeting)+' '+st.disclosure)+'</b>'; }
+  saludo.oninput=pintarSaludo; pintarSaludo();
+  const play=document.getElementById('vPlay');
+  if(play){
+    let audio=null;
+    play.onclick=function(){
+      const id=document.getElementById('vVoz').value;
+      const v=S.voices.find(function(x){ return x.id===id; })||S.voices[0];
+      if(!v||!v.preview){ play.textContent='Sin muestra'; setTimeout(function(){ play.innerHTML=ICON_PLAY+' Escuchar'; },2000); return; }
+      if(audio) audio.pause();
+      audio=new Audio(v.preview); audio.play().catch(function(){});
+    };
+  }
+  const faqs=document.getElementById('faqs');
+  function bindFaqDel(){ faqs.querySelectorAll('.del').forEach(function(b){ b.onclick=function(){ b.parentNode.remove(); }; }); }
+  bindFaqDel();
+  document.getElementById('faqAdd').onclick=function(){
+    if(faqs.querySelectorAll('.faq').length>=MAX_FAQ) return;
+    faqs.insertAdjacentHTML('beforeend',faqRow('','')); bindFaqDel();
+  };
+  document.getElementById('vGuardar').onclick=async function(){
+    const btn=this, msg=document.getElementById('vMsg');
+    const faq=[].slice.call(faqs.querySelectorAll('.faq')).map(function(f){ return {q:f.querySelector('.fq').value.trim(),a:f.querySelector('.fa').value.trim()}; }).filter(function(x){ return x.q&&x.a; });
+    const modo=document.querySelector('input[name=vModo]:checked');
+    const vozSel=document.getElementById('vVoz');
+    btn.disabled=true; msg.textContent='Guardando…';
+    const r=await api('PUT','/voice',{
+      voice_id:vozSel?vozSel.value:'', greeting:saludo.value, mode:modo?modo.value:'book',
+      transfer_number:document.getElementById('vTransfer').value, aliases:document.getElementById('vApodos').value, faq:faq,
+    });
+    btn.disabled=false;
+    msg.textContent=r.ok?'Guardado. Aplica desde la próxima llamada.':((r.data&&r.data.error)||'No se pudo guardar.');
+  };
+}
+
+// ---------- Llamadas ----------
+const RESULTADO={booked:['Cita','ok'],message:['Mensaje','warn'],transferred:['Pasada a una persona','ok'],none:['Sin cita ni mensaje','']};
+async function loadCalls(){
+  const box=document.getElementById('calls');
+  const r=await api('GET','/voice/calls');
+  if(!r.ok){ box.innerHTML='<div class="empty">No se pudieron cargar las llamadas.</div>'; return; }
+  const list=r.data.calls||[];
+  if(!list.length){ box.innerHTML='<div class="empty">Todavía no ha contestado llamadas.<br>Cuando lo haga, aquí ves quién llamó, qué pasó y la grabación.</div>'; return; }
+  box.innerHTML=list.map(function(c){
+    const res=RESULTADO[c.outcome]||RESULTADO.none;
+    const mins=c.duration_sec?Math.max(1,Math.round(c.duration_sec/60))+' min':'en curso';
+    return '<div class="call"><div class="top"><span class="when">'+esc(fechaHora(c.started_at))+'</span>'
+      +'<span class="badge '+res[1]+'">'+esc(res[0]+(c.outcome==='booked'&&c.appointment_code?' '+c.appointment_code:''))+'</span>'
+      +(c.limited?'<span class="badge warn">Sin minutos</span>':'')+'</div>'
+      +'<div class="meta">'+esc(telBonito(c.from_number))+' · '+esc(mins)+'</div>'
+      +(c.summary?'<p>'+esc(c.summary)+'</p>':'')
+      +(c.has_recording?'<button class="btn-ghost rec" type="button" data-id="'+esc(c.call_id)+'" style="margin-top:8px">'+ICON_PLAY+' Escuchar la llamada</button>':'')
+      +'</div>';
+  }).join('');
+  box.querySelectorAll('.rec').forEach(function(b){
+    b.onclick=async function(){
+      b.disabled=true; b.textContent='Cargando…';
+      const r=await api('GET','/voice/calls/'+encodeURIComponent(b.dataset.id)+'/recording');
+      if(!r.ok||!r.data.url){ b.disabled=false; b.textContent=(r.data&&r.data.error)||'No se pudo cargar'; return; }
+      const a=document.createElement('audio'); a.controls=true; a.src=r.data.url; a.preload='none';
+      b.replaceWith(a); a.play().catch(function(){});
+    };
+  });
+}
+load();
+</script>
+</body>
+</html>

@@ -375,6 +375,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <a data-v="lealtad" class="navlink">Lealtad</a>
       <a href="productos.html" class="navlink">Tienda</a>
       <a href="espera.html" class="navlink">Lista de espera</a>
+      <a href="recepcionista.html" class="navlink">Recepcionista IA</a>
       <a data-v="ordenes" class="navlink">Órdenes</a>
       <a data-v="horario" class="navlink">Horario</a>
       <a data-v="contabilidad" class="navlink">Contabilidad</a>
@@ -3171,7 +3172,7 @@ function openMenu(){ var d=document.getElementById('mobDrawer'),b=document.getEl
 function closeMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.remove('open'); b.classList.remove('open'); if(h) h.setAttribute('aria-expanded','false'); }
 function buildMobnav(){
   const nav = document.getElementById('mobDrawer');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['marketing','Marketing'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['#recepcionista.html','Recepcionista IA'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['marketing','Marketing'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
   // Móvil: drawer off-canvas (hamburguesa) en vez de una barra de pestañas.
   nav.innerHTML = items.map(function(it){
     return '<a data-v="'+it[0]+'">'+it[1]+'</a>';
