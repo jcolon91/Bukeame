@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recupera clientes — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Recupera clientes en Bukéame: les escribimos por email a tus clientes que no han vuelto y te enseñamos quién regresó.">
+<meta name="theme-color" content="#0E8074">
+<link rel="canonical" href="https://bukeame.com/recupera.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);--warn-ink:#8a5a13;--warn-bg:#FBEFD8;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{color-scheme:dark;
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);--warn-ink:#EFB85C;--warn-bg:rgba(239,161,47,.18);
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .spacer{flex:1}
+.theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px}
+h1{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.025em;margin-bottom:5px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:22px}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}
+.card h2{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.015em;margin-bottom:4px}
+.card .lead{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+.big{font-family:var(--mono);font-weight:700;font-size:30px;letter-spacing:-.01em;color:var(--green);margin:6px 0 2px}
+.big-sub{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.prose{font-size:14px;line-height:1.6}
+.prose b,.mono{font-family:var(--mono);font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:14px;padding:12px 18px;border-radius:13px;background:var(--green);color:var(--green-ink);transition:filter .15s}
+.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.55;cursor:default}
+.btn-ghost{background:var(--card-soft);color:var(--text);border:1.5px solid var(--border);padding:8px 12px;font-size:12.5px;border-radius:10px;font-weight:600}
+.btn-ghost.danger{color:#C0392B}
+.note{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:10px}
+.bar{height:9px;border-radius:99px;background:var(--card-soft);overflow:hidden;margin:10px 0 6px}
+.bar span{display:block;height:100%;background:var(--green);border-radius:99px}
+.field{margin-bottom:16px}
+.field>label,.field>.lbl{display:block;font-weight:700;font-size:13.5px;margin-bottom:6px}
+.field .help{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45}
+input[type=text],input[type=url],select{width:100%;font:inherit;font-size:14px;padding:11px 12px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text)}
+input:focus,select:focus{outline:2px solid var(--green);outline-offset:1px;border-color:transparent}
+.field>label.opt{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1.5px solid var(--border);border-radius:12px;cursor:pointer;font-weight:400}
+.field>label.opt:has(input:checked){border-color:var(--green);background:var(--green-soft)}
+.opt input{margin-top:3px;accent-color:var(--green)}
+.opt b{display:block;font-size:13.5px}.opt span{font-size:12.5px;color:var(--muted)}
+.save-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.save-row .msg{font-size:12.5px;color:var(--muted)}
+.camp{padding:14px 0;border-top:1px solid var(--border)}
+.camp:first-of-type{border-top:0;padding-top:4px}
+.camp .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.camp .kind{font-weight:700;font-size:14px}
+.camp .subj{font-size:13.5px;margin-top:5px}
+.camp p{font-size:13px;color:var(--muted);line-height:1.5;margin-top:4px}
+.camp .acts{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+.badge{font-size:10.5px;font-weight:700;font-family:var(--mono);letter-spacing:.02em;padding:2px 8px;border-radius:99px;background:var(--card-soft);color:var(--muted)}
+.badge.ok{background:var(--green-soft);color:var(--green)}
+.badge.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.empty{text-align:center;color:var(--muted);font-size:13.5px;padding:22px 10px;line-height:1.6}
+.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,#0E8074,#0A5B52);color:#fff;border-radius:22px;box-shadow:0 12px 36px var(--green-glow)}
+html[data-theme="dark"] .locked{background:linear-gradient(135deg,#2BC56A,#36E27B);color:#08160F}
+.locked .ic{width:54px;height:54px;margin:0 auto 14px;border-radius:16px;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.locked h2{font-family:var(--display);font-weight:800;font-size:23px;letter-spacing:-.02em;margin-bottom:8px}
+.locked p{font-size:14px;opacity:.92;line-height:1.55;margin-bottom:16px}
+.locked .hoy{font-size:14px;line-height:1.55;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;margin:0 0 18px}
+.locked .hoy b{font-family:var(--mono)}
+.locked .price{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em}
+.locked .price-sub{font-size:13px;opacity:.85;margin:2px 0 20px}
+.locked .soon{display:inline-block;font-weight:700;font-size:13.5px;padding:11px 18px;border-radius:14px;background:rgba(255,255,255,.16)}
+.locked a{display:inline-block;background:var(--card);color:var(--green);font-weight:700;font-size:14px;padding:13px 24px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.info{background:var(--green-soft);border:1px solid var(--border);border-radius:16px;padding:15px 17px;font-size:13px;color:var(--green);line-height:1.5;margin-bottom:14px}
+.warnbox{background:var(--warn-bg);color:var(--warn-ink);border-radius:14px;padding:13px 15px;font-size:13px;line-height:1.5;margin-bottom:12px}
+.warnbox a{text-decoration:underline;font-weight:700}
+.modal{position:fixed;inset:0;background:rgba(10,15,12,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}
+.modal.on{display:flex}
+.modal .box{background:var(--card);border-radius:18px;width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.modal .head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.modal .head .t{flex:1;font-weight:700;font-size:14px;min-width:0}
+.modal .head .t small{display:block;font-weight:400;color:var(--muted);font-size:12px;margin-top:2px}
+.modal iframe{border:0;width:100%;height:70vh;background:#F4F2EA}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+</style>
+<script src="bukeame-core.js"></script>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav"><a href="panel.html" class="back" aria-label="Volver al panel">←</a><span class="logo">Buk<i>é</i>ame</span><span class="spacer"></span><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap">
+  <h1>Recupera clientes</h1>
+  <p class="sub">Les escribimos a tus clientes que no han vuelto.</p>
+  <div id="content"></div>
+</div>
+</div>
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Vista del email">
+  <div class="box"><div class="head"><div class="t" id="mTitle"></div><button class="btn-ghost" id="mClose" type="button">Cerrar</button></div><iframe id="mFrame" title="Vista del email" sandbox></iframe></div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+const API='/api';
+const token=localStorage.getItem('bukeame_token');
+if(!token){ location.href='acceso.html'; }
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const r=await fetch(API+path,opts);
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
+const ICON_MAIL='<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
+
+let S=null;
+function dinero(c){ const n=Number(c||0)/100; return '$'+(Number.isInteger(n)?n.toLocaleString('es-PR'):n.toLocaleString('es-PR',{minimumFractionDigits:2,maximumFractionDigits:2})); }
+function num(n){ return Number(n||0).toLocaleString('es-PR'); }
+function fechaCorta(iso){ try{ return new Date(iso).toLocaleDateString('es-PR',{day:'numeric',month:'long'}); }catch(e){ return ''; } }
+function fechaHora(iso){ try{ return new Date(iso).toLocaleString('es-PR',{weekday:'long',day:'numeric',month:'long',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
+function plural(n,uno,varios){ return num(n)+' '+(Number(n)===1?uno:varios); }
+
+async function load(){
+  const r=await api('GET','/recupera');
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+  const content=document.getElementById('content');
+  if(!r.ok){
+    if(window.bkErrorInto){ window.bkErrorInto(content,'No se pudo cargar Recupera clientes.',load); }
+    else { content.innerHTML='<div class="empty">No se pudo cargar. Intenta de nuevo.</div>'; }
+    if(window.bkCaptureError) window.bkCaptureError(new Error('recupera http '+r.status),{where:'recupera.load'});
+    return;
+  }
+  S=r.data;
+  if(!S.addon_active){ content.innerHTML=bloqueadoHtml(); return; }
+  content.innerHTML=avisosHtml()+resultadosHtml()+campanasHtml()+clientesHtml()+ajustesHtml()+usoHtml();
+  bindCampanas(); bindAjustes();
+}
+
+// ---------- Sin el add-on: lo que haría con sus propios datos ----------
+function bloqueadoHtml(){
+  const a=S.audience;
+  const hoy=a&&a.con_email>0
+    ? '<div class="hoy">Hoy tienes <b>'+num(a.no_vuelven)+'</b> '+(a.no_vuelven===1?'cliente que ya vino y no ha vuelto':'clientes que ya vinieron y no han vuelto')+', y <b>'+num(a.con_email)+'</b> de tus clientes tienen email.</div>'
+    : '';
+  return '<div class="locked"><div class="ic">'+ICON_MAIL+'</div><h2>Que vuelvan los que no han vuelto</h2>'
+    +'<p>Cada dos semanas vemos quién no ha regresado según su propio ritmo de visitas. La IA le escribe un email con tus servicios y precios, una persona de Wifnix lo revisa y sale con el nombre de tu negocio. A los que vinieron esta semana les pedimos una reseña en Google. Cada mes te enseñamos cuántos volvieron y cuánto dejaron en citas.</p>'
+    +hoy
+    +'<div class="price">'+dinero(S.price_cents)+' al mes</div><div class="price-sub">Hasta 1,500 emails al mes</div>'
+    +(S.ready
+      ? '<a href="panel.html#cuenta" class="ios-hide-purchase">Activarlo en Mi cuenta</a>'
+      : '<div class="soon">Muy pronto. Te avisamos cuando puedas activarlo.</div>')
+    +'</div>';
+}
+
+function avisosHtml(){
+  let h='';
+  if(!S.ready) h+='<div class="info">Ya tienes Recupera clientes. Estamos terminando de preparar los envíos. Mientras tanto, deja listos tus ajustes.</div>';
+  if(!S.has_address) h+='<div class="warnbox">Pon la dirección de tu negocio en <a href="panel.html#negocio">Mi negocio</a>. La ley pide que cada email promocional la lleve y, sin ella, no sale ninguna campaña.</div>';
+  if(S.settings&&!S.settings.enabled) h+='<div class="warnbox">Pausaste las campañas. No se prepara ninguna hasta que las vuelvas a activar en Ajustes.</div>';
+  return h;
+}
+
+// ---------- Lo que ha traído ----------
+function resultadosHtml(){
+  const x=S.results_90d||{};
+  if(!x.enviados){
+    return '<div class="card"><h2>Lo que ha traído</h2><p class="prose">Todavía no ha salido ninguna campaña. La primera se prepara en las próximas horas y te avisamos por WhatsApp antes de que salga, para que la veas.</p></div>';
+  }
+  let p='En los últimos 90 días salieron <b>'+num(x.campanas)+'</b> '+(x.campanas===1?'campaña':'campañas')+' a <b>'+num(x.enviados)+'</b> clientes.';
+  if(x.enviados_winback) p+=' '+(x.volvieron===1?'Uno volvió':'<b>'+num(x.volvieron)+'</b> volvieron')+' a reservar en las dos semanas después del email'
+    +(x.por_venir_cents?(x.cumplidas_cents?', y '+dinero(x.por_venir_cents)+' de esas citas todavía no llegan.':'; esas citas todavía no llegan.'):'.');
+  if(x.resenas_abiertas) p+=' '+plural(x.resenas_abiertas,'persona abrió','personas abrieron')+' la página para dejarte una reseña.';
+  let control='';
+  if(x.control>=4){
+    const conPct=x.enviados_winback?Math.round(100*x.volvieron/x.enviados_winback):0;
+    const sinPct=Math.round(100*x.control_volvieron/x.control);
+    control='<p class="note">Para comparar, apartamos un grupo de '+num(x.control)+' clientes que no recibió nada. De ellos volvió el '+sinPct+' %; de los que sí lo recibieron, el '+conPct+' %.</p>';
+  }
+  return '<div class="card"><h2>Lo que ha traído</h2><div class="big">'+dinero((x.cumplidas_cents||0)+(x.por_venir_cents||0))+'</div><div class="big-sub">en citas de clientes que volvieron</div>'
+    +'<p class="prose">'+p+'</p>'+control+'</div>';
+}
+
+// ---------- Campañas ----------
+function estadoBadge(k){
+  if(k.status==='pending_review') return '<span class="badge warn">Preparando</span>';
+  if(k.status==='approved') return '<span class="badge ok">Sale pronto</span>';
+  if(k.status==='sending') return '<span class="badge ok">Saliendo</span>';
+  if(k.status==='sent') return '<span class="badge ok">Enviada</span>';
+  return '<span class="badge">Detenida</span>';
+}
+function campanaTexto(k){
+  if(k.status==='pending_review') return 'Wifnix la está revisando. Antes de que salga te avisamos y la puedes ver.';
+  if(k.status==='approved') return 'Sale el '+esc(fechaHora(k.send_at))+' a unos '+num(k.audience_count)+' clientes. Si no quieres que salga, detenla antes.';
+  if(k.status==='sending') return 'Está saliendo ahora.';
+  if(k.status==='sent'){
+    let t='Salió el '+esc(fechaCorta(k.sent_at))+' a '+plural(k.sent_count,'cliente','clientes')+'.';
+    if(k.kind==='review') t+=' '+(k.clics?plural(k.clics,'persona abrió','personas abrieron')+' la página de reseñas.':'Nadie ha abierto la página de reseñas todavía.');
+    else t+=' '+(k.volvieron?(k.volvieron===1?'Volvió 1':'Volvieron '+num(k.volvieron))+(k.citas_cents?' ('+dinero(k.citas_cents)+' en citas).':'.'):'Nadie ha vuelto todavía; contamos las reservas de 2 semanas.');
+    if(k.capped) t+=' A '+num(k.capped)+' no les llegó porque se acabaron los emails del periodo.';
+    return t;
+  }
+  if(k.cancelled_by==='owner') return 'La detuviste antes de que saliera.';
+  return k.review_note?esc(k.review_note):'No salió.';
+}
+function campanasHtml(){
+  const cs=S.campaigns||[];
+  const lista=cs.length?cs.map(function(k){
+    const ver=(k.status!=='pending_review')?'<button class="btn-ghost ver" type="button" data-id="'+esc(k.id)+'">Ver el email</button>':'';
+    const parar=(k.status==='pending_review'||k.status==='approved')?'<button class="btn-ghost danger parar" type="button" data-id="'+esc(k.id)+'">Detenerla</button>':'';
+    return '<div class="camp"><div class="top"><span class="kind">'+esc(k.kind_label)+'</span>'+estadoBadge(k)+'</div>'
+      +(k.subject?'<div class="subj">'+esc(k.subject)+'</div>':'')
+      +'<p>'+campanaTexto(k)+'</p>'
+      +((ver||parar)?'<div class="acts">'+ver+parar+'</div>':'')+'</div>';
+  }).join(''):'<div class="empty">Aquí vas a ver cada campaña: cuándo sale, a cuántos les llegó y quién volvió.</div>';
+  return '<div class="card"><h2>Campañas</h2><p class="lead">Te extrañamos sale cada dos semanas si hay clientes que no han vuelto. La de reseñas, cada semana a los que vinieron.</p><div id="camps">'+lista+'</div></div>';
+}
+function bindCampanas(){
+  document.querySelectorAll('.ver').forEach(function(b){ b.onclick=function(){ verEmail(b.dataset.id); }; });
+  document.querySelectorAll('.parar').forEach(function(b){
+    b.onclick=async function(){
+      if(b.dataset.ok!=='1'){ b.dataset.ok='1'; b.textContent='Toca otra vez para detenerla'; return; }
+      b.disabled=true; b.textContent='Deteniendo…';
+      const r=await api('POST','/recupera/campanas/'+encodeURIComponent(b.dataset.id)+'/detener');
+      if(r.ok){ load(); return; }
+      b.disabled=false; b.dataset.ok=''; b.textContent=(r.data&&r.data.error)||'No se pudo detener';
+    };
+  });
+}
+async function verEmail(id){
+  const r=await api('GET','/recupera/campanas/'+encodeURIComponent(id)+'/vista');
+  if(!r.ok){ alert((r.data&&r.data.error)||'No se pudo abrir el email.'); return; }
+  document.getElementById('mTitle').innerHTML=esc(r.data.subject)+'<small>'+esc(r.data.preheader||'')+'</small>';
+  document.getElementById('mFrame').srcdoc=r.data.html;
+  document.getElementById('modal').classList.add('on');
+}
+document.getElementById('mClose').onclick=function(){ document.getElementById('modal').classList.remove('on'); };
+document.getElementById('modal').onclick=function(e){ if(e.target.id==='modal') e.currentTarget.classList.remove('on'); };
+
+// ---------- Tus clientes ----------
+function clientesHtml(){
+  const a=S.audience||{};
+  let p='De tus <b>'+num(a.clientes)+'</b> clientes con visitas, <b>'+num(a.con_email)+'</b> tienen email. Hoy hay <b>'+num(a.no_vuelven)+'</b> que no han vuelto y les puede llegar la próxima campaña.';
+  if(a.de_baja) p+=' '+plural(a.de_baja,'cliente se dio de baja','clientes se dieron de baja')+' y no le volvemos a escribir.';
+  return '<div class="card"><h2>Tus clientes</h2><p class="prose">'+p+'</p><p class="note">Solo les escribimos a clientes que ya vinieron, nunca a listas compradas, y nadie recibe más de un email cada tres semanas. Para llegarle a más gente, pide el email al reservar o añádelo en Clientes.</p></div>';
+}
+
+// ---------- Ajustes ----------
+function ajustesHtml(){
+  const s=S.settings;
+  const dias=[30,45,60,90].map(function(d){ return '<option value="'+d+'"'+(s.lapsed_days===d?' selected':'')+'>'+d+' días</option>'; }).join('');
+  return '<div class="card"><h2>Ajustes</h2><p class="lead">Tú pones las reglas; el resto lo hacemos nosotros.</p>'
+    +'<div class="field"><label class="opt"><input type="checkbox" id="sEnabled"'+(s.enabled?' checked':'')+'><div><b>Preparar campañas</b><span>Si lo apagas, no se prepara ni sale ninguna hasta que lo vuelvas a prender.</span></div></label></div>'
+    +'<div class="field"><label for="sOffer">Tu oferta para los que vuelvan (opcional)</label><input type="text" id="sOffer" maxlength="140" value="'+esc(s.offer_text)+'" placeholder="Ej.: El lavado va gratis con tu corte este mes."><div class="help">La copiamos tal cual. Si la dejas vacía, el email no ofrece nada: nunca inventamos descuentos.</div></div>'
+    +'<div class="field"><label for="sReview">Enlace para dejar reseñas en Google</label><input type="url" id="sReview" value="'+esc(s.google_review_url)+'" placeholder="https://g.page/r/..."><div class="help">En tu Perfil de Empresa de Google, toca Pedir reseñas y copia el enlace. Sin él no pedimos reseñas.</div></div>'
+    +'<div class="field"><label for="sDias">Cuándo un cliente "no ha vuelto"</label><select id="sDias">'+dias+'</select><div class="help">Para clientes con menos de 3 visitas. A los demás les escribimos según su propio ritmo: si vienen cada 3 semanas, a las 4 o 5 sin venir.</div></div>'
+    +'<div class="save-row"><button class="btn" id="sSave" type="button">Guardar</button><span class="msg" id="sMsg"></span></div></div>';
+}
+function bindAjustes(){
+  document.getElementById('sSave').onclick=async function(){
+    const b=this, msg=document.getElementById('sMsg');
+    b.disabled=true; msg.textContent='Guardando…';
+    const r=await api('PUT','/recupera',{
+      enabled:document.getElementById('sEnabled').checked,
+      offer_text:document.getElementById('sOffer').value.trim(),
+      google_review_url:document.getElementById('sReview').value.trim(),
+      lapsed_days:Number(document.getElementById('sDias').value),
+    });
+    b.disabled=false;
+    if(r.ok){ msg.textContent='Guardado.'; S.settings=Object.assign(S.settings,{enabled:r.data.settings.enabled,offer_text:r.data.settings.offer_text||'',google_review_url:r.data.settings.google_review_url||'',lapsed_days:r.data.settings.lapsed_days}); return; }
+    msg.textContent=(r.data&&r.data.error)||'No se pudo guardar.';
+  };
+}
+
+// ---------- Emails del periodo ----------
+function usoHtml(){
+  const u=S.usage||{}, pct=Math.min(100,Math.round(100*(u.emails_sent||0)/Math.max(1,u.emails_included||1)));
+  return '<div class="card"><h2>Emails del periodo</h2><div class="bar"><span style="width:'+pct+'%"></span></div>'
+    +'<p class="note" style="margin-top:0">'+num(u.emails_sent)+' de '+num(u.emails_included)+' emails. Vuelven a empezar cuando se renueva tu add-on'+(u.period_end?' el '+esc(fechaCorta(u.period_end)):'')+'.</p></div>';
+}
+
+load();
+</script>
+</body>
+</html>

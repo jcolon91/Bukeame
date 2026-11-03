@@ -4462,9 +4462,15 @@ setInterval(() => { expireUnpaidOrders().catch(e => console.error('expireUnpaidO
 // Recepcionista IA: lista solo con las 3 llaves de Retell en el .env. Hasta entonces el
 // add-on NO se vende en el panel (sí lo puede activar el admin para probar).
 const vozLista = () => !!(process.env.RETELL_VOZ_KEY && process.env.RETELL_API_KEY && process.env.RETELL_AGENT_ID);
-const addonVendible = (code) => String(code) !== 'ai_receptionist' || vozLista();
+// Recupera clientes: listo con Resend y el remitente del subdominio de campañas.
+const recuperaLista = () => !!(RESEND_API_KEY && process.env.EMAIL_FROM_CAMPANAS);
+const addonVendible = (code) => {
+  if (String(code) === 'ai_receptionist') return vozLista();
+  if (String(code) === 'win_back') return recuperaLista();
+  return true;
+};
 const sharedHelpers = {
-  vozLista, addonVendible,
+  vozLista, recuperaLista, addonVendible,
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
   sendEmail, emailPlatformReceipt, emailReceipt, emailGiftCard,
@@ -4496,6 +4502,12 @@ try {
   setTimeout(() => voz.revisarLineas().catch(e => console.error('voz:', e.message)), 90_000);
   setInterval(() => { voz.revisarLineas().catch(e => console.error('voz:', e.message)); },
     Number(process.env.VOZ_REVISAR_MS) || 30 * 60_000);
+  // Recupera clientes (add-on, campañas por email). Prepara cada hora, envía cada 2 min.
+  const recupera = require('./module-recupera').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  const cadaHora = Number(process.env.RECUPERA_PLAN_MS) || 3600_000;
+  setTimeout(() => { recupera.planificar(); recupera.atribuir(); }, 120_000);
+  setInterval(() => { recupera.planificar(); recupera.atribuir(); recupera.informeMensual(); }, cadaHora);
+  setInterval(() => { recupera.enviarPendientes(); }, Number(process.env.RECUPERA_ENVIO_MS) || 120_000);
 } catch (e) {
   console.error('⚠ Error montando módulos v1.1:', e.message);
 }

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Darte de baja — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Deja de recibir los emails de un negocio en Bukéame.">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F1EFE5;--card:#FFFFFF;--border:#E1DCCD;--text:#17150F;--muted:#5E594B;--green:#0E8074;--green-ink:#FFFFFF;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif}
+html[data-theme="dark"]{color-scheme:dark;--bg:#0B1A13;--card:#12251B;--border:rgba(255,255,255,.1);--text:#ECEAE0;--muted:#8AA197;--green:#36E27B;--green-ink:#08160F;
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;min-height:100vh}
+button{font:inherit;cursor:pointer;border:0}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px}
+.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.wrap{max-width:460px;margin:0 auto;padding:40px 16px 60px}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:26px 22px}
+h1{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.02em;margin-bottom:10px}
+p{font-size:14.5px;line-height:1.6;color:var(--muted);margin-bottom:16px}
+p b{color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;padding:13px 22px;border-radius:14px;background:var(--green);color:var(--green-ink)}
+.btn:disabled{opacity:.55;cursor:default}
+.msg{font-size:13px;color:#C0392B;margin-top:12px}
+</style>
+</head>
+<body>
+<script>(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+<nav class="nav"><span class="logo">Buk<i>é</i>ame</span></nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap"><div class="card" id="card"><p>Cargando…</p></div></div>
+<script>
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+const t=new URLSearchParams(location.search).get('t')||'';
+const card=document.getElementById('card');
+function listo(nombre){
+  card.innerHTML='<h1>Listo</h1><p>No te van a llegar más emails de <b>'+esc(nombre)+'</b>. Los avisos de tus citas por WhatsApp te siguen llegando como siempre.</p>';
+}
+(async function(){
+  if(!/^[0-9a-f-]{36}$/i.test(t)){ card.innerHTML='<h1>Enlace no válido</h1><p>Abre el enlace que viene al final del email.</p>'; return; }
+  let r,d={};
+  try{ r=await fetch('/api/public/baja/'+t); d=await r.json(); }catch(e){}
+  if(!r||!r.ok){ card.innerHTML='<h1>Enlace no válido</h1><p>'+esc(d.error||'Abre el enlace que viene al final del email.')+'</p>'; return; }
+  if(d.unsubscribed){ listo(d.business_name); return; }
+  card.innerHTML='<h1>¿Ya no quieres sus emails?</h1><p>Vas a dejar de recibir los emails de <b>'+esc(d.business_name)+'</b> en '+esc(d.email)+'.</p>'
+    +'<button class="btn" id="go" type="button">Darme de baja</button><div class="msg" id="msg"></div>';
+  document.getElementById('go').onclick=async function(){
+    this.disabled=true;
+    try{
+      const x=await fetch('/api/public/baja/'+t,{method:'POST'}); const j=await x.json().catch(()=>({}));
+      if(x.ok){ listo(j.business_name||d.business_name); return; }
+      document.getElementById('msg').textContent=j.error||'No se pudo. Intenta de nuevo.';
+    }catch(e){ document.getElementById('msg').textContent='No se pudo. Revisa tu conexión e intenta de nuevo.'; }
+    this.disabled=false;
+  };
+})();
+</script>
+</body>
+</html>
