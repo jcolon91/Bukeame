@@ -254,6 +254,13 @@ const uploadLogo = multer({
     else cb(new Error('Solo se permiten imágenes JPG, PNG o WEBP'));
   },
 });
+// El mimetype lo declara el navegador y se puede falsificar, pero sharp lee lo que de
+// verdad haya adentro: un SVG con etiqueta de PNG llegaba a librsvg. Bloqueamos todos
+// los lectores de libvips menos JPG, PNG y WEBP en memoria, que es lo único que usan
+// las subidas (aplica a todo el proceso). Además, en cada subida `autoOrient` endereza
+// la foto según el EXIF del celular; sin eso se guardaba de lado.
+sharp.block({ operation: ['VipsForeignLoad'] });
+sharp.unblock({ operation: ['VipsForeignLoadJpegBuffer', 'VipsForeignLoadPngBuffer', 'VipsForeignLoadWebpBuffer'] });
 
 const origins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
 // En producción NUNCA reflejamos cualquier origen: si no hay lista, negamos por
@@ -1167,7 +1174,7 @@ app.post('/api/businesses/me/logo', authRequired, businessScope,
     const filename = `${req.business.id}-${Date.now()}.webp`;
     const filepath = path.join(LOGO_DIR, filename);
     try {
-      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error', autoOrient: true })
         .resize(800, 800, { fit: 'cover', position: 'centre' })
         .webp({ quality: 85 })
         .toFile(filepath);
@@ -1211,7 +1218,7 @@ app.post('/api/businesses/me/cover', authRequired, businessScope,
     const filename = `${req.business.id}-${Date.now()}.webp`;
     const filepath = path.join(COVER_DIR, filename);
     try {
-      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error', autoOrient: true })
         .resize(1600, 1000, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 84 })
         .toFile(filepath);
@@ -1264,7 +1271,7 @@ app.post('/api/businesses/me/portfolio', authRequired, businessScope,
     const filename = `${req.business.id}-${crypto.randomUUID()}.webp`;
     const filepath = path.join(PORTFOLIO_DIR, filename);
     try {
-      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error', autoOrient: true })
         .resize(1200, 800, { fit: 'cover', position: 'centre' })
         .webp({ quality: 82 })
         .toFile(filepath);
@@ -1528,7 +1535,7 @@ app.post('/api/staff/:id/photo', authRequired, businessScope,
     const filename = `${req.params.id}-${Date.now()}.webp`;
     const filepath = path.join(STAFF_DIR, filename);
     try {
-      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error', autoOrient: true })
         .resize(400, 400, { fit: 'cover', position: 'centre' })
         .webp({ quality: 85 })
         .toFile(filepath);
@@ -1583,7 +1590,7 @@ app.post('/api/products/:id/photo', authRequired, businessScope,
     const filename = `${req.params.id}-${crypto.randomUUID()}.webp`;
     const filepath = path.join(PRODUCTS_DIR, filename);
     try {
-      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error' })
+      await sharp(req.file.buffer, { limitInputPixels: 24000000, failOn: 'error', autoOrient: true })
         .resize(800, 800, { fit: 'cover', position: 'centre' })
         .webp({ quality: 82 })
         .toFile(filepath);
