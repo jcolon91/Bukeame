@@ -317,6 +317,12 @@ function mount(app, ctx) {
     try { exp = await computeExpected(kind, req.body); }
     catch (e) { if (e.userMsg) return bad(res, e.userMsg, e.httpStatus); throw e; }
 
+    // Lo que ya se renueva solo con tarjeta (Stripe) no se cobra otra vez por ATH.
+    if (h.tarjeta && ['plan', 'addon', 'addons'].includes(kind)) {
+      const msg = await h.tarjeta.bloqueaAth(req.business.id, kind, exp.refCode, exp.codesArr);
+      if (msg) return bad(res, msg, 409);
+    }
+
     const created = await athCreate(
       exp.montoEsperadoCents, phone,
       String(req.business.id), kind + ':' + exp.refCode, exp.title);

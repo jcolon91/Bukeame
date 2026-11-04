@@ -217,6 +217,8 @@ app.post('/api/payments/stripe/webhook',
 // /api/voz se guarda una copia (req.rawBody) para verificar la firma. El parser global
 // de abajo ya no vuelve a leer estos pedidos.
 app.use('/api/voz', express.json({ limit: '5mb', verify: (req, _res, buf) => { req.rawBody = buf; } }));
+// El webhook del cobro con tarjeta (module-tarjeta) también necesita los bytes exactos.
+app.use('/api/billing/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // --- Uploads (logos de negocios) ---
@@ -4233,9 +4235,12 @@ async function expireBilling() {
         AND now() > current_period_end + interval '7 days'`);
   // Trials Pro vencidos (referidos) → bajan a 'free'. Sin esto el trial nunca
   // caducaba (current_period_end queda NULL) y quedaba Pro gratis para siempre.
+  // Si ya puso tarjeta, el primer cobro es al terminar la prueba: tiene los mismos
+  // 7 días de gracia que un plan pagado mientras Stripe cobra.
   await db.query(
     `UPDATE subscriptions SET plan_code = 'free', status = 'cancelled'
-      WHERE status = 'trialing' AND trial_ends_at IS NOT NULL AND now() > trial_ends_at`);
+      WHERE status = 'trialing' AND trial_ends_at IS NOT NULL AND now() > trial_ends_at
+        AND (stripe_subscription_id IS NULL OR now() > trial_ends_at + interval '7 days')`);
 }
 setInterval(() => { expireBilling().catch(e => console.error('expireBilling:', e.message)); }, 3600_000);
 
@@ -4344,7 +4349,8 @@ async function alertClientCancel(businessId, appointmentId, detail) {
 
 // ── Recordatorio de renovación: 3 días y 1 día antes de vencer plan/add-on ──
 // Una vez al día por fila (guard renew_reminded_on). Si el negocio renueva,
-// current_period_end se mueve → el recordatorio de 1 día ya no aplica.
+// current_period_end se mueve → el recordatorio de 1 día ya no aplica. Lo que se
+// renueva solo con tarjeta no recibe el aviso (sí si canceló la renovación).
 const ADDON_NAMES = { payroll:'Nómina', employee_accounting:'Contabilidad de empleado', gift_cards:'Gift Cards', loyalty:'Lealtad', store_10:'Tienda', store_25:'Tienda', sms:'Recordatorios SMS', custom_domain:'Dominio propio', advanced_reports:'Reportes avanzados', featured:'Destacado' };
 async function sendRenewReminder(r, kind, code, stage) {
   const what = kind === 'plan' ? `tu plan ${code}` : `tu add-on ${ADDON_NAMES[code] || code}`;
@@ -4367,6 +4373,7 @@ async function remindRenewals() {
          FROM businesses b, users u
         WHERE s.business_id = b.id AND u.id = b.owner_user_id AND b.deleted_at IS NULL
           AND s.plan_code <> 'free' AND s.current_period_end IS NOT NULL
+          AND (s.stripe_subscription_id IS NULL OR s.cancel_at_period_end)
           AND (s.current_period_end AT TIME ZONE 'America/Puerto_Rico')::date = (now() AT TIME ZONE 'America/Puerto_Rico')::date + $1::int
           AND (s.renew_reminded_on IS NULL OR s.renew_reminded_on < CURRENT_DATE)
         RETURNING b.id AS business_id, b.whatsapp, u.email AS owner_email, s.plan_code, s.current_period_end`, [stage.d]);
@@ -4376,6 +4383,7 @@ async function remindRenewals() {
          FROM businesses b, users u
         WHERE a.business_id = b.id AND u.id = b.owner_user_id AND b.deleted_at IS NULL
           AND a.status = 'active' AND a.current_period_end IS NOT NULL
+          AND (a.stripe_subscription_id IS NULL OR a.cancel_at_period_end)
           AND (a.current_period_end AT TIME ZONE 'America/Puerto_Rico')::date = (now() AT TIME ZONE 'America/Puerto_Rico')::date + $1::int
           AND (a.renew_reminded_on IS NULL OR a.renew_reminded_on < CURRENT_DATE)
         RETURNING b.id AS business_id, b.whatsapp, u.email AS owner_email, a.code, a.current_period_end`, [stage.d]);
@@ -4517,6 +4525,16 @@ try {
   setInterval(() => { recupera.enviarPendientes(); }, Number(process.env.RECUPERA_ENVIO_MS) || 120_000);
 } catch (e) {
   console.error('⚠ Error montando módulos v1.1:', e.message);
+}
+// Cobro con tarjeta (Stripe Billing) del plan y los add-ons. Inerte sin STRIPE_SECRET_KEY +
+// STRIPE_BILLING_WEBHOOK_SECRET. En su propio try para que un fallo no tumbe lo demás; los
+// otros módulos lo usan por h.tarjeta (cancelar, no cobrar dos veces por ATH, borrar cuenta).
+try {
+  sharedHelpers.tarjeta = require('./module-tarjeta').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  setInterval(() => { sharedHelpers.tarjeta.conciliar().catch(e => console.error('tarjeta:', e.message)); },
+    Number(process.env.TARJETA_CONCILIAR_MS) || 3600_000);
+} catch (e) {
+  console.error('⚠ Error montando el cobro con tarjeta:', e.message);
 }
 
 // ============================================================================

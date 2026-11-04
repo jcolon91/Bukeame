@@ -41,7 +41,8 @@ module.exports.mount = function (app, ctx) {
 
     // Estado de la suscripción
     const subQ = await db.query(
-      `SELECT plan_code, status, trial_ends_at, current_period_end, created_at
+      `SELECT plan_code, status, trial_ends_at, current_period_end, created_at,
+              cancel_at_period_end, (stripe_subscription_id IS NOT NULL) AS on_card
          FROM subscriptions WHERE business_id = $1
          ORDER BY created_at DESC LIMIT 1`, [req.business.id]);
 
@@ -85,6 +86,8 @@ module.exports.mount = function (app, ctx) {
         status: sub.status,
         trial_ends_at: sub.trial_ends_at,
         current_period_end: sub.current_period_end,
+        cancel_at_period_end: sub.cancel_at_period_end,
+        on_card: sub.on_card,          // se renueva solo con tarjeta (Stripe)
         since: sub.created_at,
       } : null,
       usage: {
@@ -118,6 +121,14 @@ module.exports.mount = function (app, ctx) {
     // sigue activo hasta el fin del período pagado (+7 días de gracia); el worker
     // lo baja a 'free' solo después. (Mismo principio que los add-ons.)
     if (planCode === 'free') {
+      // Si el plan va en tarjeta, primero se cancela en Stripe (si no, seguiría cobrando).
+      if (h.tarjeta) {
+        try { await h.tarjeta.cancelarRenovacion(req.business.id, 'plan'); }
+        catch (e) {
+          console.error('tarjeta cancelar plan:', e.message);
+          return bad(res, 'No pudimos cancelar el cobro con tarjeta. Intenta de nuevo en un rato.', 502);
+        }
+      }
       const { rows } = await db.query(
         `UPDATE subscriptions SET cancel_at_period_end = true
           WHERE business_id = $1 AND plan_code <> 'free'
@@ -168,7 +179,8 @@ module.exports.mount = function (app, ctx) {
   app.get('/api/account/addons', authRequired, businessScope, asyncH(async (req, res) => {
     const { rows } = await db.query(
       `SELECT c.code, c.name, c.price_cents, c.billing, c.description,
-              (a.code IS NOT NULL) AS is_active
+              (a.code IS NOT NULL) AS is_active, a.current_period_end, a.cancel_at_period_end,
+              (a.stripe_subscription_id IS NOT NULL) AS on_card
          FROM addon_catalog c
          LEFT JOIN addons a
                 ON a.code = c.code
@@ -215,6 +227,15 @@ module.exports.mount = function (app, ctx) {
       `SELECT owner_user_id FROM businesses WHERE id = $1`, [bizId]);
     if (!own.rows[0] || own.rows[0].owner_user_id !== userId)
       return bad(res, 'Solo el dueño puede borrar la cuenta', 403);
+
+    // Ningún cobro con tarjeta puede seguir vivo después de borrar la cuenta.
+    if (h.tarjeta) {
+      try { await h.tarjeta.cancelarTodo(bizId); }
+      catch (e) {
+        console.error('tarjeta cancelar todo:', e.message);
+        return bad(res, 'No pudimos cancelar tu cobro con tarjeta. Intenta de nuevo en un rato.', 502);
+      }
+    }
 
     const client = await db.connect();
     try {

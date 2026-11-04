@@ -880,6 +880,19 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           <div id="addonTotal" style="display:none;margin-top:14px;padding:12px 14px;background:var(--green-soft);border:1px solid var(--green-border,var(--border));border-radius:12px;font-size:13.5px;color:var(--ink);line-height:1.5"></div>
         </div>
 
+        <!-- Tarjeta y facturas: la página de Stripe para cambiar la tarjeta, ver facturas o cancelar.
+             Solo sale si el negocio ya pagó algo con tarjeta. -->
+        <div class="card ios-hide-purchase" id="tarjetaCard" style="display:none">
+          <div class="seclabel">Tarjeta y facturas</div>
+          <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Cambia la tarjeta, baja tus facturas o cancela la renovación. Se abre la página segura de Stripe.</p>
+          <div class="alert" id="tarjetaAlert"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button type="button" class="btn btn-ghost btn-sm" id="tarjetaPortalBtn">Abrir Tarjeta y facturas</button>
+            <button type="button" class="btn btn-sm" id="tarjetaQuitarBtn" style="background:transparent;border:1.5px solid #C0392B;color:#C0392B">Quitar tarjeta y cobro automático</button>
+          </div>
+          <p style="font-size:12px;color:var(--ink2);margin-top:10px;line-height:1.5">Si la quitas, no se te cobra nada más. Lo que ya pagaste se respeta: tu plan y tus add-ons siguen activos hasta su fecha.</p>
+        </div>
+
         <!-- Destacar mi negocio -->
         <div class="card ios-hide-purchase">
           <div class="seclabel">Destacar mi negocio</div>
@@ -2008,6 +2021,17 @@ async function boot(){
       }, 300);
     }
   } catch(e){ console.error('stripeReturn', e); }
+  // Vuelta del pago con tarjeta o de "Tarjeta y facturas" (Stripe): ?tarjeta=ok|no|portal
+  try {
+    var sp2 = new URLSearchParams(location.search);
+    var tj = sp2.get('tarjeta');
+    if(tj){
+      var sesion = sp2.get('sesion');
+      history.replaceState(null,'',location.pathname);
+      switchView('cuenta');
+      volverDeTarjeta(tj, sesion);
+    }
+  } catch(e){ console.error('tarjetaReturn', e); }
   // Navegación por hash: enlaces externos como productos.html#cuenta abren la sección.
   try {
     var h = (location.hash || '').replace(/^#/, '').trim();
@@ -3588,6 +3612,7 @@ const FEATURE_LABELS = {
 
 async function loadAccount(){
   clearAlert('acctMsg');
+  await loadTarjetaConfig();
   const r = await api('GET','/account/plan');
   if(!r.ok){ showAlert('acctMsg', r.data.error||'No se pudo cargar tu plan', false); return; }
   const d = r.data;
@@ -3612,14 +3637,45 @@ async function loadAccount(){
     subInfo = '<span style="font-size:12px;padding:3px 10px;border-radius:99px;background:'+(st==='active'?'var(--sub-active)':'var(--sub-other)')+';color:var(--ink)">'+esc(stLabel)+'</span>';
     if(d.subscription.current_period_end){
       const dt = new Date(d.subscription.current_period_end);
-      subInfo += '<span style="font-size:12px;color:var(--ink2);margin-left:8px">Vence '+dt.toLocaleDateString('es-PR')+'</span>';
+      const renueva = d.subscription.on_card && !d.subscription.cancel_at_period_end;
+      subInfo += '<span style="font-size:12px;color:var(--ink2);margin-left:8px">'+(renueva?'Próximo cobro: ':'Vence: ')+esc(addonDate(dt))+'</span>';
     }
+  }
+  // Tarjeta: si el plan ya se renueva solo, se dice; si no, se ofrece pasarlo a tarjeta.
+  const sub = d.subscription || {};
+  let cardHtml = '';
+  if(sub.on_card && sub.cancel_at_period_end){
+    cardHtml = '<div class="ios-hide-purchase" style="margin-top:12px;font-size:12.5px;color:var(--ink2);line-height:1.5">'+
+      'Cancelaste la renovación con tarjeta. Tu plan sigue activo'+(sub.current_period_end?' hasta el '+esc(addonDate(sub.current_period_end)):'')+'.'+
+      '<div style="margin-top:8px"><button type="button" class="btn btn-ghost btn-sm" id="planResumeBtn">Reanudar</button></div></div>';
+  } else if(sub.on_card){
+    cardHtml = '<div class="ios-hide-purchase" style="margin-top:12px;font-size:12.5px;color:var(--ink2);line-height:1.5">'+
+      'Se renueva solo con tu tarjeta cada mes.'+
+      '<div style="margin-top:8px"><button type="button" class="btn btn-ghost btn-sm" id="planCancelCardBtn">Cancelar la renovación</button></div></div>';
+  } else if(TARJETA.enabled && cur.price_monthly_cents && (sub.status==='active' || sub.status==='trialing')){
+    cardHtml = '<div class="ios-hide-purchase" style="margin-top:12px">'+
+      '<button type="button" class="btn btn-ghost btn-sm" id="planCardBtn">Activar cobro automático</button>'+
+      '<p style="font-size:12px;color:var(--ink2);margin-top:6px">Deja de renovar a mano: se cobra solo cada mes y lo cancelas cuando quieras.</p></div>';
   }
   document.getElementById('planCurrent').innerHTML =
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">'+
     '<b style="font-size:20px">'+esc(cur.name||d.current_name)+'</b>'+
     (cur.price_monthly_cents ? '<span style="font-size:14px;color:var(--ink2)">'+money(cur.price_monthly_cents)+'/mes</span>' : '<span style="font-size:14px;color:var(--ink2)">Gratis</span>')+
-    subInfo+'</div>'+usageHtml;
+    subInfo+'</div>'+usageHtml+cardHtml;
+  const pcb = document.getElementById('planCardBtn');
+  if(pcb) pcb.onclick = function(){ payWithCard('acctMsg', { kind:'plan', code:d.current_code }); };
+  const prb = document.getElementById('planResumeBtn');
+  if(prb) prb.onclick = function(){ resumeCard('acctMsg', 'plan'); };
+  const pxb = document.getElementById('planCancelCardBtn');
+  if(pxb) pxb.onclick = async function(){
+    clearAlert('acctMsg');
+    if(!(await askConfirm('¿Cancelar la renovación con tarjeta? Tu plan sigue activo hasta el final de lo pagado y después pasa al plan gratis.', { okText:'Cancelar la renovación', cancelText:'No' }))) return;
+    pxb.disabled = true;
+    const rr = await api('POST','/account/plan',{ plan_code:'free' });
+    pxb.disabled = false;
+    if(rr.ok){ await loadAccount(); showAlert('acctMsg','Listo. No se renueva más; tu plan sigue activo hasta el final de lo pagado.', true); return; }
+    showAlert('acctMsg', (rr.data&&rr.data.error)||'No se pudo cancelar la renovación.', false);
+  };
 
   // ── Lista de planes (solo upgrades + el actual marcado) ──
   const list = document.getElementById('planList');
@@ -3647,10 +3703,12 @@ async function loadAccount(){
       if(rr.ok){ showAlert('acctMsg','¡Plan actualizado!', true); loadAccount(); return; }
       b.disabled=false; b.textContent='Cambiar a este plan';
       if(rr.status===402){
-        // Pago pendiente: ofrecer ATH Móvil si está disponible.
+        // Pago pendiente: tarjeta (se renueva sola) y/o ATH Móvil (un mes). Si el plan ya va
+        // en tarjeta, el cambio se hace en la misma tarjeta.
         const planRow = (d.plans||[]).find(function(p){ return (p.code||p.plan_code||p.id)===b.dataset.code; }) || {};
         const planCents = planRow.price_monthly_cents || 0;
-        offerAthPay('acctMsg', { kind:'plan', code:b.dataset.code, amountCents:planCents, title:'Plan '+(planRow.name||b.dataset.code)+' · 1 mes' });
+        offerPay('acctMsg', { kind:'plan', code:b.dataset.code, amountCents:planCents, title:'Plan '+(planRow.name||b.dataset.code)+' · 1 mes' },
+          { soloTarjeta: !!(sub.on_card && !sub.cancel_at_period_end) });
       }
       else showAlert('acctMsg', (rr.data&&rr.data.error)||'No se pudo cambiar de plan.', false);
     };
@@ -3668,7 +3726,8 @@ function addonMonthlyCents(a){
 function renderAddonTotal(addons){
   const box = document.getElementById('addonTotal');
   if(!box) return;
-  const active = addons.filter(function(a){ return a.is_active; });
+  // Lo que tiene la renovación cancelada ya no se cobra el próximo mes.
+  const active = addons.filter(function(a){ return a.is_active && !a.cancel_at_period_end; });
   const addonsCents = active.reduce(function(s,a){ return s + addonMonthlyCents(a); }, 0);
   const totalCents = PLAN_PRICE_CENTS + addonsCents;
   box.style.display = 'block';
@@ -3742,22 +3801,38 @@ async function loadAddons(){
     html += '<div id="addonSelTotal" style="margin-top:14px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">'+
         '<span style="font-size:13px;color:var(--ink2)">Total seleccionado</span>'+
         '<b id="addonSelTotalVal" style="font-family:var(--mono);font-size:15px;color:var(--green)">'+money(0)+'</b></div>';
-    html += '<button class="btn btn-teal btn-sm" id="addonPayBtn" type="button" style="margin-top:12px;padding:11px 18px" disabled>Pagar con ATH Móvil ('+money(0)+')</button>';
+    const conAth = athAvailable() || !TARJETA.enabled;
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
+      (TARJETA.enabled ? '<button class="btn btn-teal btn-sm" id="addonCardBtn" type="button" style="padding:11px 18px" disabled>Pagar con tarjeta ('+money(0)+'/mes)</button>' : '')+
+      (conAth ? '<button class="btn '+(TARJETA.enabled?'btn-ghost':'btn-teal')+' btn-sm" id="addonPayBtn" type="button" style="padding:11px 18px" disabled>Pagar con ATH Móvil ('+money(0)+')</button>' : '')+
+      '</div>'+
+      (TARJETA.enabled && conAth ? '<p style="font-size:12px;color:var(--ink2);margin-top:8px">Con tarjeta se renueva solo cada mes. Con ATH Móvil pagas un mes y lo renuevas tú.</p>' : '');
   }
 
   // ── Activos: sin checkbox, con opción de cancelar ──
   if(activeRows.length){
     html += '<div style="font-size:12px;color:var(--ink2);margin:'+(availRows.length?'20px':'0')+' 0 8px;font-weight:600;border-top:'+(availRows.length?'1px solid var(--border)':'0')+';padding-top:'+(availRows.length?'16px':'0')+'">Activos</div>';
     html += activeRows.map(function(a){
+      let estado = '';
+      if(a.current_period_end){
+        if(a.on_card && !a.cancel_at_period_end) estado = 'Se renueva solo con tarjeta el '+esc(addonDate(a.current_period_end));
+        else if(a.cancel_at_period_end) estado = 'Renovación cancelada — activo hasta el '+esc(addonDate(a.current_period_end));
+        else estado = 'Vigente hasta el '+esc(addonDate(a.current_period_end));
+      }
+      // Tarjeta: reanudar lo cancelado en tarjeta, o pasar a tarjeta lo que se paga a mano.
+      let botones = '';
+      if(a.on_card && a.cancel_at_period_end)
+        botones += '<button class="btn btn-ghost btn-sm addon-resume ios-hide-purchase" type="button" data-code="'+esc(a.code)+'">Reanudar</button>';
+      else if(!a.on_card && TARJETA.enabled && a.billing==='monthly')
+        botones += '<button class="btn btn-ghost btn-sm addon-tocard ios-hide-purchase" type="button" data-code="'+esc(a.code)+'">Activar cobro automático</button>';
+      if(!a.cancel_at_period_end)
+        botones += '<button class="btn btn-ghost btn-sm addon-cancel" type="button" data-code="'+esc(a.code)+'">Cancelar</button>';
       return '<div class="addon-row"><div class="grow"><h4>'+esc(a.name||a.code)+'</h4>'+
         (a.description?'<p>'+esc(a.description)+'</p>':'')+
         '<span class="addon-price">'+priceLabel(a)+'</span>'+
-        (a.current_period_end ? '<p style="font-size:12px;color:var(--ink2);margin-top:4px">'+
-          (a.cancel_at_period_end
-            ? 'Renovación cancelada — activo hasta '+esc(addonDate(a.current_period_end))
-            : 'Vigente hasta '+esc(addonDate(a.current_period_end)))+'</p>' : '')+
+        (estado ? '<p style="font-size:12px;color:var(--ink2);margin-top:4px">'+estado+'</p>' : '')+
         '</div>'+
-        '<button class="btn btn-ghost btn-sm addon-cancel" type="button" data-code="'+esc(a.code)+'" style="flex:none">Cancelar</button></div>';
+        (botones ? '<div style="display:flex;flex-direction:column;gap:6px;flex:none">'+botones+'</div>' : '')+'</div>';
     }).join('');
   }
 
@@ -3766,6 +3841,7 @@ async function loadAddons(){
   // ── Selección múltiple: total en vivo + botón de pago único ──
   const selBoxes = wrap.querySelectorAll('.addon-sel');
   const payBtn = document.getElementById('addonPayBtn');
+  const cardBtn = document.getElementById('addonCardBtn');
   const totalVal = document.getElementById('addonSelTotalVal');
   function selectedCodes(){
     return Array.prototype.filter.call(selBoxes, function(c){ return c.checked; })
@@ -3784,6 +3860,10 @@ async function loadAddons(){
       payBtn.textContent = 'Pagar con ATH Móvil ('+money(cents)+')';
       payBtn.disabled = (n === 0);
     }
+    if(cardBtn){
+      cardBtn.textContent = 'Pagar con tarjeta ('+money(cents)+'/mes)';
+      cardBtn.disabled = (n === 0);
+    }
   }
   selBoxes.forEach(function(c){ c.onchange = function(){ clearAlert('addonAlert'); refreshSel(); }; });
   refreshSel();
@@ -3800,20 +3880,31 @@ async function loadAddons(){
       offerAthPay('addonAlert', { kind:'addons', codes:codes, amountCents:cents, title:'Add-ons ('+codes.length+')' });
     };
   }
+  if(cardBtn){
+    cardBtn.onclick = function(){
+      const codes = selectedCodes();
+      if(codes.length === 0){ showAlert('addonAlert','Elige al menos un add-on.', false); return; }
+      payWithCard('addonAlert', { kind:'addons', codes:codes });
+    };
+  }
+  wrap.querySelectorAll('.addon-tocard').forEach(function(btn){
+    btn.onclick = function(){ payWithCard('addonAlert', { kind:'addons', codes:[btn.dataset.code] }); };
+  });
+  wrap.querySelectorAll('.addon-resume').forEach(function(btn){
+    btn.onclick = function(){ resumeCard('addonAlert', 'addon', btn.dataset.code); };
+  });
 
-  // ── Cancelar un add-on activo ──
+  // ── Cancelar un add-on activo (la renovación: se conserva hasta el final de lo pagado) ──
   wrap.querySelectorAll('.addon-cancel').forEach(function(btn){
     btn.onclick = async function(){
       clearAlert('addonAlert');
       const code = btn.dataset.code;
-      if(!(await askConfirm('¿Cancelar este add-on?'))) return;
+      if(!(await askConfirm('¿Cancelar la renovación de este add-on? Lo conservas hasta el final de lo pagado y después se apaga.', { okText:'Cancelar la renovación', cancelText:'No' }))) return;
       btn.disabled = true;
       const rr = await api('POST','/addons/'+code+'/cancel');
       btn.disabled = false;
       if(rr.ok){
-        const a = rows.find(function(x){ return x.code === code; }) || {};
-        const cents = addonMonthlyCents(a);
-        showAlert('addonAlert','Add-on desactivado.'+(cents?' Se resta '+money(cents)+'/mes de tu factura.':''), true);
+        showAlert('addonAlert','Listo. No se renueva más; lo conservas hasta el final de lo pagado.', true);
         loadAddons();
         return;
       }
@@ -4347,6 +4438,135 @@ function closeAthCheckout(){
   ATH_PENDING = null;
 }
 document.getElementById('athCancel').onclick = closeAthCheckout;
+
+// ════════════════════ TARJETA (Stripe: se renueva sola cada mes) ════════════════════
+// El backend decide cómo se cobra (hoy, el día que se acaba lo pagado, o la diferencia
+// al subir de plan) y lo dice con palabras; se le enseña al dueño ANTES de ir a la
+// página segura de Stripe. Al volver (?tarjeta=ok) se confirma sin esperar el webhook.
+var TARJETA = { enabled:false, portal:false };
+
+async function loadTarjetaConfig(){
+  try{
+    var r = await api('GET','/billing/tarjeta/config');
+    if(r.ok && r.data){ TARJETA.enabled = !!r.data.enabled; TARJETA.portal = !!r.data.portal; }
+  }catch(e){ /* sin tarjeta: queda solo ATH */ }
+  var card = document.getElementById('tarjetaCard');
+  if(card) card.style.display = TARJETA.portal ? '' : 'none';
+}
+
+// opts: { kind:'plan', code } | { kind:'addons', codes:[...] }
+async function payWithCard(alertId, opts){
+  clearAlert(alertId);
+  var body = { kind:opts.kind, vista:true };
+  if(opts.kind === 'addons') body.codes = opts.codes; else body.code = opts.code;
+  try{
+    var v = await api('POST','/billing/tarjeta/checkout', body);
+    if(!v.ok || !v.data || !v.data.aviso){
+      showAlert(alertId, (v.data && v.data.error) || 'No pudimos preparar el pago con tarjeta. Intenta de nuevo en un rato.', false);
+      return;
+    }
+    var subir = v.data.modo === 'subir';
+    var ok = await askConfirm(v.data.aviso, { okText: subir ? 'Cambiar de plan' : 'Ir a la página de pago', cancelText:'Ahora no' });
+    if(!ok) return;
+    delete body.vista;
+    showAlert(alertId, subir ? 'Cambiando tu plan…' : 'Abriendo la página segura de pago…', true);
+    var r = await api('POST','/billing/tarjeta/checkout', body);
+    if(r.ok && r.data && r.data.pendiente){
+      // El banco pidió confirmar el cobro (o no lo aprobó): se dice qué pasó antes de mover a nadie.
+      showAlert(alertId, r.data.mensaje || 'Tu banco no aprobó el cobro y el plan no cambió.', !!r.data.url);
+      if(r.data.url) setTimeout(function(){ location.href = r.data.url; }, 2500);
+      return;
+    }
+    if(r.ok && r.data && r.data.url){ location.href = r.data.url; return; }
+    if(r.ok && r.data && r.data.ok){ await loadAccount(); showAlert(alertId, r.data.mensaje || 'Listo.', true); return; }
+    showAlert(alertId, (r.data && r.data.error) || 'No pudimos abrir el pago con tarjeta. Intenta de nuevo en un rato.', false);
+  }catch(e){ showAlert(alertId, 'No hay conexión. Intenta de nuevo en un rato.', false); }
+}
+
+async function resumeCard(alertId, kind, code){
+  clearAlert(alertId);
+  try{
+    var r = await api('POST','/billing/tarjeta/reanudar', { kind:kind, code:code });
+    if(r.ok){ await loadAccount(); showAlert(alertId, 'Listo. El cobro automático sigue con tu tarjeta.', true); return; }
+    showAlert(alertId, (r.data && r.data.error) || 'No pudimos reanudarlo. Intenta de nuevo en un rato.', false);
+  }catch(e){ showAlert(alertId, 'No hay conexión. Intenta de nuevo en un rato.', false); }
+}
+
+// Tras un 402: tarjeta (se cobra cada mes) y, si se puede, ATH Móvil (un mes).
+function offerPay(alertId, opts, o2){
+  o2 = o2 || {};
+  if(!TARJETA.enabled){ offerAthPay(alertId, opts); return; }
+  var el = document.getElementById(alertId);
+  if(!el){ payWithCard(alertId, opts); return; }
+  el.className = 'alert ok';
+  el.innerHTML = '';
+  var span = document.createElement('span');
+  span.textContent = o2.soloTarjeta ? 'Tu plan va en tarjeta: el cambio se cobra a la misma tarjeta. ' : 'Escoge cómo pagar: ';
+  el.appendChild(span);
+  var bt = document.createElement('button');
+  bt.type = 'button'; bt.className = 'btn btn-teal btn-sm'; bt.style.marginLeft = '8px';
+  bt.textContent = o2.soloTarjeta ? 'Cambiar de plan' : 'Pagar con tarjeta (cada mes)';
+  bt.onclick = function(){ payWithCard(alertId, opts); };
+  el.appendChild(bt);
+  if(athAvailable() && !o2.soloTarjeta){
+    var ba = document.createElement('button');
+    ba.type = 'button'; ba.className = 'btn btn-ghost btn-sm'; ba.style.marginLeft = '8px';
+    ba.textContent = 'Pagar con ATH Móvil (un mes)';
+    ba.onclick = function(){ openAthCheckout(opts); };
+    el.appendChild(ba);
+  }
+}
+
+document.getElementById('tarjetaPortalBtn').onclick = async function(){
+  var b = this;
+  clearAlert('tarjetaAlert');
+  b.disabled = true;
+  try{
+    var r = await api('POST','/billing/tarjeta/portal');
+    if(r.ok && r.data && r.data.url){ location.href = r.data.url; return; }
+    showAlert('tarjetaAlert', (r.data && r.data.error) || 'No pudimos abrir la página de Stripe. Intenta de nuevo en un rato.', false);
+  }catch(e){ showAlert('tarjetaAlert', 'No hay conexión. Intenta de nuevo en un rato.', false); }
+  finally{ b.disabled = false; }
+};
+
+document.getElementById('tarjetaQuitarBtn').onclick = async function(){
+  var b = this;
+  clearAlert('tarjetaAlert');
+  var ok = await askConfirm('¿Quitar tu tarjeta? No se te cobra nada más y lo que ya pagaste sigue activo hasta su fecha.'+
+    (athAvailable() ? ' Después puedes renovar con ATH Móvil o con otra tarjeta.' : ' Después puedes volver a poner una tarjeta.'),
+    { okText:'Quitar la tarjeta', cancelText:'No' });
+  if(!ok) return;
+  b.disabled = true;
+  try{
+    var r = await api('POST','/billing/tarjeta/quitar');
+    if(r.ok){
+      await loadAccount();
+      showAlert('tarjetaAlert', (r.data.tarjetas || r.data.cobros)
+        ? 'Listo. Borramos tu tarjeta y no se te va a cobrar nada más. Lo que pagaste sigue activo hasta su fecha.'
+        : 'No tenías tarjeta guardada ni cobros automáticos.', true);
+      return;
+    }
+    showAlert('tarjetaAlert', (r.data && r.data.error) || 'No pudimos quitar la tarjeta. Intenta de nuevo en un rato.', false);
+  }catch(e){ showAlert('tarjetaAlert', 'No hay conexión. Intenta de nuevo en un rato.', false); }
+  finally{ b.disabled = false; }
+};
+
+// Vuelta de Stripe: ?tarjeta=ok&sesion=… (pagó), ?tarjeta=no (se salió), ?tarjeta=portal.
+async function volverDeTarjeta(tj, sesion){
+  if(tj === 'no'){ showAlert('acctMsg','Saliste de la página de pago. No se hizo ningún cobro.', true); return; }
+  if(tj !== 'ok' || !sesion) return;
+  showAlert('acctMsg','Confirmando con Stripe…', true);
+  for(var i = 0; i < 15; i++){
+    var r;
+    try{ r = await api('GET','/billing/tarjeta/estado?sesion='+encodeURIComponent(sesion)); }
+    catch(e){ r = { ok:false, status:0 }; }
+    if(r.ok && r.data && r.data.listo){ await loadAccount(); showAlert('acctMsg', r.data.mensaje || 'Listo.', true); return; }
+    if(r.ok && r.data && r.data.estado === 'expired'){ showAlert('acctMsg','La página de pago venció sin cobrar nada. Puedes intentarlo otra vez.', true); return; }
+    if(!r.ok && r.status !== 502 && r.status !== 0) break;
+    await new Promise(function(res){ setTimeout(res, 2000); });
+  }
+  showAlert('acctMsg','Tu pago todavía se está confirmando. Si en unos minutos no ves el cambio, escríbenos por WhatsApp.', true);
+}
 
 loadAthConfig();
 boot();

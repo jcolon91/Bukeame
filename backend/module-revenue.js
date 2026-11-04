@@ -251,6 +251,14 @@ module.exports.mount = function (app, ctx) {
   // y el cliente lo conserva hasta el fin del período pagado (+7 días de gracia);
   // el worker lo expira solo después. Esto arregla el bug de pérdida inmediata.
   app.post('/api/addons/:code/cancel', authRequired, businessScope, asyncH(async (req, res) => {
+    // Si va en tarjeta, primero se cancela en Stripe (si no, seguiría cobrando).
+    if (h.tarjeta) {
+      try { await h.tarjeta.cancelarRenovacion(req.business.id, 'addon', String(req.params.code)); }
+      catch (e) {
+        console.error('tarjeta cancelar add-on:', e.message);
+        return bad(res, 'No pudimos cancelar el cobro con tarjeta. Intenta de nuevo en un rato.', 502);
+      }
+    }
     const { rows } = await db.query(
       `UPDATE addons SET cancel_at_period_end = true
         WHERE business_id = $1 AND code = $2 AND status = 'active'
