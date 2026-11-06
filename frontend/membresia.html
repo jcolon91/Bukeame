@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Membresías — Bukéame</title>
+<meta name="description" content="Compra una membresía de este negocio, págala por adelantado y usa tus visitas al reservar en línea. También puedes consultar cuántas visitas te quedan.">
+<link rel="canonical" href="https://bukeame.com/membresia.html">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='19' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Membresías — Bukéame">
+<meta property="og:description" content="Paga por adelantado y usa tus visitas al reservar en línea.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Bukéame">
+<meta property="og:locale" content="es_PR">
+<meta property="og:image" content="https://bukeame.com/og-cover.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);--field:#FDFCF8;
+--warn-ink:#8a5a13;--warn-bg:#FBEFD8;--warn-border:#F0D7A6;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--hero:linear-gradient(135deg,#11221E,#0A5B52);--hero-ink:#FFF8EC;
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{color-scheme:dark;
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);--field:rgba(255,255,255,.05);
+--warn-ink:#EFB85C;--warn-bg:rgba(239,161,47,.14);--warn-border:rgba(239,161,47,.32);
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px);
+--hero:linear-gradient(135deg,#10231D,#0A453A);--hero-ink:#ECF6F2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px;line-height:1}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .spacer{flex:1}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:11px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:8px;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:540px;margin:0 auto;padding:24px 16px 50px}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:40px 22px;line-height:1.7;background:var(--card);border:1px dashed var(--border);border-radius:18px}
+.empty a{color:var(--green);font-weight:700}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+
+.hero{background:var(--hero);color:var(--hero-ink);border-radius:20px;padding:22px;margin-bottom:18px;position:relative;overflow:hidden}
+.hero .biz{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.75}
+.hero h1{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.02em;margin-top:6px}
+.hero p{font-size:13px;opacity:.9;line-height:1.5;margin-top:6px}
+.hero .deco{position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.06)}
+
+.tabs{display:flex;background:var(--card-soft);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:18px}
+.tabs button{flex:1;font-weight:700;font-size:13.5px;padding:10px;border-radius:9px;color:var(--muted);transition:background .18s ease,color .18s ease}
+.tabs button.on{background:var(--green);color:var(--green-ink)}
+.pane{display:none}.pane.on{display:block;animation:fade .22s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:14px}
+.lab{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+
+.plan .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.plan h2{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.015em;line-height:1.2}
+.plan .price{font-family:var(--mono);font-weight:700;font-size:21px;color:var(--green);white-space:nowrap}
+.plan .per{font-size:12.5px;color:var(--muted);margin-top:3px}
+.plan .desc{font-size:13.5px;color:var(--muted);line-height:1.55;margin-top:10px}
+.facts{list-style:none;margin:14px 0 4px;display:grid;gap:7px}
+.facts li{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;line-height:1.45}
+.facts svg{flex:none;width:16px;height:16px;margin-top:2px;color:var(--green)}
+.terms-tg{font-size:12.5px;font-weight:700;color:var(--green);margin-top:10px;display:inline-flex;align-items:center;gap:5px}
+.terms{display:none;font-size:12.5px;color:var(--muted);line-height:1.6;white-space:pre-wrap;background:var(--card-soft);border-radius:12px;padding:12px 14px;margin-top:8px}
+.terms.on{display:block}
+.pick{width:100%;margin-top:14px;background:var(--green);color:var(--green-ink);font-weight:800;font-size:14.5px;padding:13px;border-radius:13px}
+
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.field input{width:100%;font:inherit;font-size:15px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--border);background:var(--field);color:var(--text)}
+.field input::placeholder{color:var(--muted2)}
+.field input:focus{outline:none;border-color:var(--green)}
+.field .help{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:12px 13px;border:1.5px solid var(--border);border-radius:13px;cursor:pointer;margin-bottom:8px;background:var(--field)}
+.opt:has(input:checked){border-color:var(--green);background:var(--green-soft)}
+.opt input{margin-top:3px;accent-color:var(--green)}
+.opt b{display:block;font-size:14px}.opt span{font-size:12.5px;color:var(--muted);line-height:1.4}
+.accept{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;margin:14px 0 4px;cursor:pointer}
+.accept input{margin-top:3px;accent-color:var(--green);width:17px;height:17px;flex:none}
+.sumline{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px;padding:10px 0;border-bottom:1px solid var(--border)}
+.sumline b{font-family:var(--mono)}
+.cta{width:100%;background:var(--green);color:var(--green-ink);font-weight:800;font-size:15px;padding:15px;border-radius:14px;margin-top:10px;text-align:center}
+.cta:disabled{opacity:.6;cursor:not-allowed}
+.ghost{width:100%;background:var(--card-soft);border:1px solid var(--border);font-weight:700;font-size:14px;padding:12px;border-radius:13px;margin-top:10px}
+.note{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:12px;text-align:center}
+.backlink{font-size:13px;font-weight:700;color:var(--green);display:inline-block;margin-bottom:12px}
+
+.alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:12px;margin-bottom:14px;line-height:1.45}
+.alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;border-color:rgba(225,75,60,.35)}
+.alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--green-glow)}
+.alert.warn{display:block;background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-border)}
+
+.result{text-align:center}
+.result .ic-ok{width:70px;height:70px;border-radius:50%;background:var(--green);color:var(--green-ink);display:grid;place-items:center;margin:4px auto 14px}
+.result .ic-wait{width:70px;height:70px;border-radius:50%;background:var(--warn-bg);color:var(--warn-ink);display:grid;place-items:center;margin:4px auto 14px}
+.result h3{font-family:var(--display);font-weight:800;font-size:22px;margin-bottom:6px}
+.result p{font-size:13.5px;color:var(--muted);line-height:1.55}
+.code{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:.1em;color:var(--green);background:var(--green-soft);border-radius:13px;padding:14px;margin:14px 0 8px;word-break:break-all}
+.copy{display:inline-flex;align-items:center;gap:7px;background:var(--card-soft);color:var(--green);font-weight:700;font-size:13px;padding:9px 18px;border-radius:11px;border:1px solid var(--border);margin-bottom:8px}
+.meta{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:9px 0;border-top:1px solid var(--border);text-align:left}
+.meta span:first-child{color:var(--muted);flex:none}
+.meta b{text-align:right}
+.st{display:inline-block;font-size:12px;font-weight:700;padding:4px 12px;border-radius:99px;background:var(--green-soft);color:var(--green)}
+.st.wait{background:var(--warn-bg);color:var(--warn-ink)}
+.st.dead{background:#FCE8E6;color:#A1281C}
+html[data-theme="dark"] .st.dead{background:rgba(225,75,60,.14);color:#FF9A8E}
+.bigleft{font-family:var(--display);font-weight:800;font-size:40px;letter-spacing:-.02em;margin:4px 0 0}
+.spin{width:22px;height:22px;border:3px solid var(--green-soft);border-top-color:var(--green);border-radius:50%;animation:sp 1s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(max-width:420px){.plan .top{flex-direction:column}.code{font-size:22px}
+  .nav{padding:12px;gap:8px}.nav .logo{font-size:17px}.theme-tg button{padding:6px 9px}}
+</style>
+<script src="bukeame-core.js"></script>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav"><a href="#" class="back" id="backBtn" aria-label="Volver">←</a><span class="logo">Buk<i>é</i>ame</span><span class="spacer"></span><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap" id="content"></div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+var API = '/api';
+var QS = new URLSearchParams(location.search);
+var SLUG = QS.get('slug');
+var DATA = null;          // { business, plans, payment_options }
+var CUR = null;           // membresía en curso { id, code, ... }
+
+var ICO = {
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 7"/></svg>',
+  okBig:'<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 7"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  hash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>',
+  list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
+};
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function money(c){ return '$'+(Number(c||0)/100).toLocaleString('es-PR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fdate(s){ if(!s) return '—'; try{ return new Date(s).toLocaleDateString('es-PR',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return ''; } }
+function visitsTxt(v){ return v==null ? 'Visitas sin límite' : (v===1 ? '1 visita' : v+' visitas'); }
+function svcTxt(p){ return p.all_services ? 'Cualquier servicio' : p.service_names.join(', '); }
+async function pub(method, path, body){
+  var o = { method:method, headers:{} };
+  if(body){ o.headers['Content-Type']='application/json'; o.body = JSON.stringify(body); }
+  var r = await fetch(API+path, o);
+  var d = {}; try{ d = await r.json(); }catch(e){}
+  return { ok:r.ok, status:r.status, data:d };
+}
+function alertIn(id, msg, kind){ var el=document.getElementById(id); if(!el) return; el.textContent=msg; el.className='alert '+(kind||'err'); }
+function base(){ return '/public/'+encodeURIComponent(SLUG)+'/memberships'; }
+function bookUrl(){ return 'negocio.html?slug='+encodeURIComponent(SLUG); }
+function rememberCode(code){ try{ localStorage.setItem('bk_mem_'+SLUG, code); }catch(e){} }
+
+document.getElementById('backBtn').onclick = function(e){ e.preventDefault(); if(history.length>1) history.back(); else location.href = SLUG ? bookUrl() : 'index.html'; };
+
+function show(){ document.getElementById('boot').style.display='none'; document.getElementById('app').style.display='block'; }
+
+(async function init(){
+  if(!SLUG){
+    show();
+    document.getElementById('content').innerHTML = '<div class="empty">Para ver las membresías, abre el enlace desde la página de un negocio.<br><br><a href="buscar.html">Buscar negocios →</a></div>';
+    return;
+  }
+  var r;
+  try{ r = await pub('GET', base()); }catch(e){ r = { ok:false, status:0, data:{} }; }
+  show();
+  if(!r.ok){
+    document.getElementById('content').innerHTML = '<div class="empty">'+(r.status===404 ? 'No encontramos ese negocio.' : 'No pudimos cargar las membresías. Revisa tu conexión e intenta de nuevo.')+'<br><br><a href="'+(r.status===404?'buscar.html':esc(location.href))+'">'+(r.status===404?'Buscar negocios →':'Intentar de nuevo')+'</a></div>';
+    return;
+  }
+  DATA = r.data;
+  document.title = 'Membresías · '+DATA.business.name+' — Bukéame';
+  renderShell();
+  // Vuelta de Stripe: ?m=<id>&pago=ok|no
+  var mid = QS.get('m');
+  if(mid){ backFromCard(mid, QS.get('pago')); return; }
+})();
+
+function renderShell(){
+  var c = document.getElementById('content');
+  c.innerHTML =
+    '<div class="hero"><div class="deco"></div><div class="biz">Membresías de</div><h1>'+esc(DATA.business.name)+'</h1>'+
+      '<p>Paga por adelantado y usa tus visitas cuando reserves en línea.</p></div>'+
+    '<div class="tabs"><button class="on" data-p="buy">Comprar</button><button data-p="mine">Mi membresía</button></div>'+
+    '<div class="pane on" id="buy"></div><div class="pane" id="mine"></div>';
+  c.querySelectorAll('.tabs button').forEach(function(b){
+    b.onclick = function(){
+      c.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x===b); });
+      c.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('on', p.id===b.dataset.p); });
+    };
+  });
+  renderPlans();
+  renderMine();
+}
+
+// ── Comprar ───────────────────────────────────────────────────────────────
+function renderPlans(){
+  var el = document.getElementById('buy');
+  if(!DATA.plans.length){
+    el.innerHTML = '<div class="empty">'+esc(DATA.business.name)+' no está vendiendo membresías en este momento.<br><br><a href="'+bookUrl()+'">Volver al negocio →</a></div>';
+    return;
+  }
+  el.innerHTML = DATA.plans.map(function(p, i){
+    return '<div class="card plan">'+
+      '<div class="top"><div><h2>'+esc(p.name)+'</h2><div class="per">Dura '+esc(p.period)+'</div></div><div class="price">'+money(p.price_cents)+'</div></div>'+
+      (p.description ? '<p class="desc">'+esc(p.description)+'</p>' : '')+
+      '<ul class="facts">'+
+        '<li>'+ICO.hash+'<span>'+esc(visitsTxt(p.visits_included))+'</span></li>'+
+        '<li>'+ICO.list+'<span>'+esc(svcTxt(p))+'</span></li>'+
+        '<li>'+ICO.cal+'<span>Dura '+esc(p.period)+' desde el día que se activa</span></li>'+
+        (p.no_show_counts ? '<li>'+ICO.alert+'<span>Si no llegas a tu cita, la visita cuenta como usada</span></li>' : '')+
+      '</ul>'+
+      '<button type="button" class="terms-tg" data-t="'+i+'">Ver los términos del negocio</button>'+
+      '<div class="terms" id="terms'+i+'">'+esc(p.terms)+'</div>'+
+      '<button type="button" class="pick" data-i="'+i+'">Escoger esta membresía</button>'+
+    '</div>';
+  }).join('') + '<p class="note">El pago le llega directo a '+esc(DATA.business.name)+'. Los términos son del negocio.</p>';
+  el.querySelectorAll('.terms-tg').forEach(function(b){
+    b.onclick = function(){
+      var t = document.getElementById('terms'+b.dataset.t);
+      var on = t.classList.toggle('on');
+      b.textContent = on ? 'Esconder los términos' : 'Ver los términos del negocio';
+    };
+  });
+  el.querySelectorAll('.pick').forEach(function(b){ b.onclick = function(){ renderForm(DATA.plans[Number(b.dataset.i)]); }; });
+}
+
+function renderForm(p){
+  var el = document.getElementById('buy');
+  var opts = DATA.payment_options || [];
+  el.innerHTML =
+    '<a href="#" class="backlink" id="formBack">← Ver todas las membresías</a>'+
+    '<div class="card">'+
+      '<div class="alert" id="buyAlert"></div>'+
+      '<div class="lab">Tu membresía</div>'+
+      '<div class="sumline"><span>'+esc(p.name)+' · '+esc(p.period)+'</span><b>'+money(p.price_cents)+'</b></div>'+
+      '<div class="sumline" style="border-bottom:0"><span style="color:var(--muted)">'+esc(visitsTxt(p.visits_included))+' · '+esc(svcTxt(p))+'</span></div>'+
+      '<div class="lab" style="margin-top:14px">Tus datos</div>'+
+      '<div class="field"><label>Tu nombre</label><input id="fName" autocomplete="name" maxlength="120" placeholder="Tu nombre completo"></div>'+
+      '<div class="field"><label>Tu WhatsApp</label><input id="fPhone" type="tel" autocomplete="tel" placeholder="787-555-1234"><div class="help">Con este teléfono y tu código usas la membresía al reservar.</div></div>'+
+      '<div class="field"><label>Tu email</label><input id="fEmail" type="email" autocomplete="email" placeholder="tu@correo.com"><div class="help">Ahí te llega el recibo con tu código.</div></div>'+
+      '<div class="lab" style="margin-top:6px">Cómo vas a pagar</div>'+
+      opts.map(function(o, i){
+        return '<label class="opt"><input type="radio" name="pay" value="'+esc(o.v)+'"'+(i===0?' checked':'')+'><div><b>'+esc(o.t)+'</b><span>'+esc(o.d)+'</span></div></label>';
+      }).join('')+
+      '<label class="accept"><input type="checkbox" id="fAccept"><span>Leí y acepto los <a href="#" id="seeTerms" style="color:var(--green);font-weight:700">términos de '+esc(DATA.business.name)+'</a> para esta membresía.</span></label>'+
+      '<div class="terms" id="formTerms">'+esc(p.terms)+'</div>'+
+      '<button class="cta" id="buyBtn">Comprar por '+money(p.price_cents)+'</button>'+
+      '<p class="note">El pago le llega directo a '+esc(DATA.business.name)+'. Para devoluciones o cambios, habla con el negocio.</p>'+
+    '</div>';
+  document.getElementById('formBack').onclick = function(e){ e.preventDefault(); renderPlans(); };
+  document.getElementById('seeTerms').onclick = function(e){ e.preventDefault(); document.getElementById('formTerms').classList.toggle('on'); };
+  document.getElementById('buyBtn').onclick = function(){ submitBuy(p); };
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+async function submitBuy(p){
+  var name = document.getElementById('fName').value.trim();
+  var phone = document.getElementById('fPhone').value.trim();
+  var email = document.getElementById('fEmail').value.trim();
+  var payEl = document.querySelector('input[name=pay]:checked');
+  if(name.length < 2){ alertIn('buyAlert','Escribe tu nombre.'); return; }
+  if(phone.replace(/\D/g,'').length < 10){ alertIn('buyAlert','Escribe tu WhatsApp de 10 dígitos.'); return; }
+  if(!/.+@.+\..+/.test(email)){ alertIn('buyAlert','Escribe tu email para el recibo.'); return; }
+  if(!payEl){ alertIn('buyAlert','Escoge cómo vas a pagar.'); return; }
+  if(!document.getElementById('fAccept').checked){ alertIn('buyAlert','Para comprarla, marca que aceptas los términos del negocio.'); return; }
+  var btn = document.getElementById('buyBtn');
+  btn.disabled = true; btn.textContent = 'Apartando tu membresía…';
+  try{
+    var r = await pub('POST', base(), { plan_id:p.id, buyer_name:name, phone:phone, email:email, accept_terms:true, pay_option:payEl.value });
+    if(!r.ok){ alertIn('buyAlert', r.data.error || 'No pudimos apartar tu membresía. Intenta de nuevo.'); btn.disabled=false; btn.textContent='Comprar por '+money(p.price_cents); return; }
+    CUR = Object.assign({}, r.data.membership, { plan:p, ath_phone:r.data.ath_phone });
+    if(CUR.pay_option === 'ath_business') return startAth(btn, p);
+    if(CUR.pay_option === 'card') return startCard(btn, p);
+    renderPending();
+  }catch(e){
+    alertIn('buyAlert','No hay conexión. Intenta de nuevo.');
+    btn.disabled=false; btn.textContent='Comprar por '+money(p.price_cents);
+  }
+}
+
+// ATH Móvil automático: le llega la solicitud a su app y aquí esperamos la confirmación.
+async function startAth(btn, p){
+  btn.textContent = 'Conectando con ATH Móvil…';
+  var r = await pub('POST', base()+'/'+encodeURIComponent(CUR.id)+'/ath/start', {});
+  if(r.ok && r.data.status === 'completed') return showActive();
+  if(!r.ok || !r.data.ecommerceId){
+    var reintento = !document.getElementById('buyAlert');
+    alertIn(reintento ? 'athAlert' : 'buyAlert', (r.data && r.data.error) || 'ATH Móvil no aceptó el pago. Intenta de nuevo.');
+    btn.disabled=false; btn.textContent = reintento ? 'Enviar la solicitud otra vez' : 'Comprar por '+money(p.price_cents);
+    return;
+  }
+  document.getElementById('buy').innerHTML =
+    '<div class="card result"><div class="ic-wait">'+ICO.clock+'</div><h3>Abre tu app de ATH Móvil</h3>'+
+    '<p>Te llegó una solicitud de pago de <b>'+money(CUR.price_cents)+'</b> a nombre de '+esc(DATA.business.name)+'. Confírmala y espera aquí.</p>'+
+    '<p style="margin-top:14px" id="athSpin"><span class="spin"></span></p><div class="alert" id="athAlert" style="margin-top:14px"></div>'+
+    '<button class="cta" id="athRetry" style="display:none">Enviar la solicitud otra vez</button></div>';
+  var tries = 0, ecom = r.data.ecommerceId;
+  // Sin salida: que pueda reintentar con la MISMA membresía (no apartar otra cada vez).
+  function stop(msg){
+    clearInterval(t);
+    document.getElementById('athSpin').style.display = 'none';
+    alertIn('athAlert', msg, 'warn');
+    var rb = document.getElementById('athRetry');
+    rb.style.display = '';
+    rb.onclick = function(){ rb.disabled = true; startAth(rb, CUR.plan || { price_cents:CUR.price_cents }); };
+  }
+  var t = setInterval(async function(){
+    tries++;
+    // La solicitud de ATH dura 10 minutos: se espera eso (150 × 4 s).
+    if(tries > 150){ stop('La solicitud de ATH Móvil venció. Si no pagaste, no se cobró nada.'); return; }
+    var q; try{ q = await pub('POST', base()+'/'+encodeURIComponent(CUR.id)+'/ath/poll', { ecommerceId:ecom }); }catch(e){ return; }
+    if(q.status === 400){ clearInterval(t); document.getElementById('athSpin').style.display = 'none'; alertIn('athAlert', q.data.error || 'El pago no coincide. Habla con el negocio.'); return; }
+    if(!q.ok) return;
+    if(q.data.status === 'completed'){ clearInterval(t); showActive(q.data.membership); }
+    else if(q.data.status === 'cancelled'){ stop('Cancelaste el pago en ATH Móvil. No se cobró nada.'); }
+    else if(q.data.status === 'expired'){ clearInterval(t); document.getElementById('athSpin').style.display = 'none'; alertIn('athAlert', q.data.message || 'Esta membresía ya no está esperando pago. No se cobró nada.', 'warn'); }
+  }, 4000);
+}
+
+async function startCard(btn, p){
+  btn.textContent = 'Abriendo la página segura de pago…';
+  var r = await pub('POST', base()+'/'+encodeURIComponent(CUR.id)+'/stripe/checkout', {});
+  if(r.ok && r.data.url){ location.href = r.data.url; return; }
+  alertIn('buyAlert', (r.data && r.data.error) || 'No pudimos abrir el pago con tarjeta. Intenta de nuevo.');
+  btn.disabled=false; btn.textContent='Comprar por '+money(p.price_cents);
+}
+
+async function backFromCard(id, pago){
+  var el = document.getElementById('buy');
+  if(pago === 'no'){
+    var e0 = await pub('GET', base()+'/'+encodeURIComponent(id)+'/estado').catch(function(){ return { ok:false }; });
+    CUR = e0.ok ? e0.data.membership : null;
+    el.innerHTML = '<div class="card result"><div class="ic-wait">'+ICO.clock+'</div><h3>No se hizo el pago</h3><p>Saliste de la página de pago y no se cobró nada.</p>'+
+      (CUR && CUR.status === 'pending' ? '<button class="cta" id="retryCard">Intentar el pago otra vez</button>' : '')+
+      '<button class="ghost" id="seePlans">Ver las membresías</button><div class="alert" id="buyAlert" style="margin-top:12px"></div></div>';
+    var rc = document.getElementById('retryCard'); if(rc) rc.onclick = function(){ startCard(rc, { price_cents:CUR.price_cents }); };
+    document.getElementById('seePlans').onclick = renderPlans;
+    return;
+  }
+  el.innerHTML = '<div class="card result"><div class="ic-wait">'+ICO.clock+'</div><h3>Confirmando tu pago…</h3><p>Esto tarda unos segundos.</p><p style="margin-top:14px"><span class="spin"></span></p></div>';
+  for(var i=0; i<15; i++){
+    var r; try{ r = await pub('GET', base()+'/'+encodeURIComponent(id)+'/estado'); }catch(e){ r = { ok:false }; }
+    if(r.ok && r.data.membership && r.data.membership.status === 'active'){ CUR = r.data.membership; return showActive(CUR); }
+    if(r.ok && r.data.membership && r.data.membership.status !== 'pending'){
+      el.innerHTML = '<div class="card result"><div class="ic-wait">'+ICO.clock+'</div><h3>Esta membresía ya no está esperando pago</h3>'+
+        '<p>Si te cobraron, habla con '+esc(DATA.business.name)+' para que la active o te devuelva el dinero.</p>'+
+        '<button class="ghost" id="seePlans2">Ver las membresías</button></div>';
+      document.getElementById('seePlans2').onclick = renderPlans;
+      return;
+    }
+    await new Promise(function(res){ setTimeout(res, 2500); });
+  }
+  el.innerHTML = '<div class="card result"><div class="ic-wait">'+ICO.clock+'</div><h3>Tu pago se está confirmando</h3>'+
+    '<p>Si pagaste, en unos minutos te llega el email con tu código y tu membresía queda activa. Si no te llega, habla con '+esc(DATA.business.name)+'.</p></div>';
+}
+
+function renderPending(){
+  var cash = CUR.pay_option === 'cash';
+  document.getElementById('buy').innerHTML =
+    '<div class="card result"><div class="ic-wait">'+ICO.clock+'</div>'+
+      '<h3>Apartamos tu membresía</h3>'+
+      '<p>'+(cash
+        ? 'Paga <b>'+money(CUR.price_cents)+'</b> en '+esc(DATA.business.name)+' y ahí te la activan.'
+        : 'Envía <b>'+money(CUR.price_cents)+'</b> por ATH Móvil al <b>'+esc(CUR.ath_phone||'')+'</b>. '+esc(DATA.business.name)+' la activa cuando vea tu pago.')+'</p>'+
+      '<div class="code">'+esc(CUR.code)+'</div>'+
+      '<button class="copy" id="copyBtn">'+ICO.copy+'Copiar código</button>'+
+      '<p>Guárdalo: también te lo enviamos por email. Te escribimos cuando esté activa.</p>'+
+      (cash ? '' :
+        '<div style="text-align:left;margin-top:16px"><div class="alert" id="refAlert"></div>'+
+        '<div class="field"><label>Número de referencia de ATH (opcional)</label><input id="refInput" maxlength="60" placeholder="Lo ves en tu app después de pagar"><div class="help">Con la referencia, el negocio encuentra tu pago más rápido.</div></div>'+
+        '<button class="ghost" id="refBtn" style="margin-top:0">Enviar la referencia</button></div>')+
+    '</div>';
+  wireCopy(CUR.code);
+  var rb = document.getElementById('refBtn');
+  if(rb) rb.onclick = async function(){
+    var v = document.getElementById('refInput').value.trim();
+    if(!v){ alertIn('refAlert','Escribe la referencia que te dio ATH Móvil.'); return; }
+    rb.disabled = true;
+    var r = await pub('POST', base()+'/'+encodeURIComponent(CUR.id)+'/referencia', { reference:v }).catch(function(){ return { ok:false, data:{} }; });
+    rb.disabled = false;
+    if(r.ok) alertIn('refAlert','Listo. Le avisamos al negocio.', 'ok');
+    else alertIn('refAlert', (r.data && r.data.error) || 'No pudimos enviarla. Intenta de nuevo.');
+  };
+}
+
+async function showActive(m){
+  if(!m || !m.ends_at){
+    var r = await pub('GET', base()+'/'+encodeURIComponent(CUR.id)+'/estado').catch(function(){ return { ok:false }; });
+    if(r.ok) m = r.data.membership;
+  }
+  m = m || CUR;
+  rememberCode(m.code);
+  document.getElementById('buy').innerHTML =
+    '<div class="card result"><div class="ic-ok">'+ICO.okBig+'</div>'+
+      '<h3>Tu membresía está activa</h3>'+
+      '<p>Para usarla, reserva en línea y escribe este código con el mismo teléfono de la compra.</p>'+
+      '<div class="code">'+esc(m.code)+'</div>'+
+      '<button class="copy" id="copyBtn">'+ICO.copy+'Copiar código</button>'+
+      '<div class="meta"><span>Membresía</span><b>'+esc(m.name)+'</b></div>'+
+      '<div class="meta"><span>Incluye</span><b>'+esc(visitsTxt(m.visits_included))+'</b></div>'+
+      '<div class="meta"><span>Vale</span><b>'+esc(fdate(m.starts_at))+' al '+esc(fdate(m.last_day||m.ends_at))+'</b></div>'+
+      '<a class="cta" style="display:block;margin-top:16px" href="'+bookUrl()+'">Reservar ahora</a>'+
+    '</div>';
+  wireCopy(m.code);
+}
+
+function wireCopy(code){
+  var b = document.getElementById('copyBtn'); if(!b) return;
+  b.onclick = function(){
+    function done(){ b.innerHTML = ICO.check.replace('<svg','<svg width="15" height="15"')+'Copiado'; }
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done).catch(done); else done();
+  };
+}
+
+// ── Mi membresía ──────────────────────────────────────────────────────────
+function renderMine(){
+  var el = document.getElementById('mine');
+  var saved = ''; try{ saved = localStorage.getItem('bk_mem_'+SLUG) || ''; }catch(e){}
+  el.innerHTML =
+    '<div class="card">'+
+      '<div class="alert" id="mineAlert"></div>'+
+      '<div class="field"><label>Código de tu membresía</label><input id="mCode" value="'+esc(saved)+'" autocomplete="off" placeholder="XX-MEM-XXXXXX" style="font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em"></div>'+
+      '<div class="field"><label>Tu WhatsApp (el de la compra)</label><input id="mPhone" type="tel" autocomplete="tel" placeholder="787-555-1234"></div>'+
+      '<button class="cta" id="mineBtn">Ver mi membresía</button>'+
+      '<div id="mineResult"></div>'+
+    '</div>';
+  document.getElementById('mineBtn').onclick = lookupMine;
+  document.getElementById('mPhone').addEventListener('keydown', function(e){ if(e.key==='Enter') lookupMine(); });
+}
+
+var ST_LBL = { active:'Activa', pending:'Esperando el pago', expired:'Vencida', cancelled:'Cancelada' };
+async function lookupMine(){
+  var code = document.getElementById('mCode').value.trim().toUpperCase();
+  var phone = document.getElementById('mPhone').value.trim();
+  document.getElementById('mineResult').innerHTML = '';
+  if(!code){ alertIn('mineAlert','Escribe el código de tu membresía.'); return; }
+  if(phone.replace(/\D/g,'').length < 10){ alertIn('mineAlert','Escribe el WhatsApp con que la compraste.'); return; }
+  document.getElementById('mineAlert').className = 'alert';
+  var btn = document.getElementById('mineBtn'); btn.disabled = true; btn.textContent = 'Buscando…';
+  try{
+    var r = await pub('POST', base()+'/consulta', { code:code, phone:phone });
+    if(!r.ok){ alertIn('mineAlert', r.data.error || 'No pudimos buscarla. Intenta de nuevo.'); return; }
+    var m = r.data.membership;
+    if(m.status === 'active') rememberCode(m.code);
+    var cls = m.status==='active' ? '' : (m.status==='pending' ? ' wait' : ' dead');
+    document.getElementById('mineResult').innerHTML =
+      '<div style="text-align:center;margin-top:18px">'+
+        '<span class="st'+cls+'">'+esc(ST_LBL[m.status]||m.status)+'</span>'+
+        (m.visits_left!=null
+          ? '<div class="bigleft">'+m.visits_left+'</div><div style="font-size:13px;color:var(--muted)">'+(m.visits_left===1?'visita disponible':'visitas disponibles')+' de '+m.visits_included+'</div>'
+          : '<div class="bigleft" style="font-size:26px;margin-top:10px">Visitas sin límite</div><div style="font-size:13px;color:var(--muted)">'+m.visits_used+' '+(m.visits_used===1?'usada':'usadas')+'</div>')+
+      '</div>'+
+      '<div style="margin-top:14px">'+
+        '<div class="meta"><span>Membresía</span><b>'+esc(m.name)+'</b></div>'+
+        '<div class="meta"><span>Cubre</span><b>'+esc(m.all_services ? 'Cualquier servicio' : m.service_names.join(', '))+'</b></div>'+
+        (m.starts_at ? '<div class="meta"><span>Vale</span><b>'+esc(fdate(m.starts_at))+' al '+esc(fdate(m.last_day||m.ends_at))+'</b></div>' : '<div class="meta"><span>Dura</span><b>'+esc(m.period)+' desde que se active</b></div>')+
+      '</div>'+
+      (m.status==='active' ? '<a class="cta" style="display:block;text-align:center;margin-top:14px" href="'+bookUrl()+'">Reservar con mi membresía</a>' : '')+
+      ((m.status==='expired'||m.status==='cancelled') && DATA.plans.length ? '<button class="ghost" id="renewBtn">Comprar otra</button>' : '');
+    var rn = document.getElementById('renewBtn');
+    if(rn) rn.onclick = function(){ document.querySelector('.tabs button[data-p=buy]').click(); renderPlans(); };
+  }catch(e){
+    alertIn('mineAlert','No hay conexión. Intenta de nuevo.');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Ver mi membresía';
+  }
+}
+</script>
+<script src="i18n.js" defer></script>
+</body>
+</html>

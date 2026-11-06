@@ -224,6 +224,7 @@ html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;
 .tl-evt.is-done-state .tl-ico{color:#A33A24}
 .tl-evt.is-pending{border-left-style:dashed}
 .tl-evt .tl-dep{display:inline-block;font-family:var(--body);font-size:9.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#5c3d0c;background:var(--mango);border-radius:6px;padding:1px 5px;margin-right:5px;vertical-align:1px}
+.tl-evt .tl-dep.tl-mem{color:var(--green-ink);background:var(--green)}
 .tl-evt.is-arrived{box-shadow:0 0 0 2px var(--mango) inset,0 1px 2px rgba(0,0,0,.05)}
 .tl-evt.is-open{box-shadow:0 0 0 2px var(--green) inset,0 6px 18px rgba(0,0,0,.18);transform:translateY(-1px)}
 /* Pin de "Llegó" dentro del bloque */
@@ -373,6 +374,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <a data-v="equipo" class="navlink">Equipo</a>
       <a data-v="clientes" class="navlink">Clientes</a>
       <a data-v="lealtad" class="navlink">Lealtad</a>
+      <a href="membresias.html" class="navlink">Membresías</a>
       <a href="productos.html" class="navlink">Tienda</a>
       <a href="espera.html" class="navlink">Lista de espera</a>
       <a href="recepcionista.html" class="navlink">Recepcionista IA</a>
@@ -2629,13 +2631,16 @@ function buildDayTimeline(list, items, staff){
       const who = a.client_name || a.service_name || 'Cita';
       // Hora corta ("10:00 am") para que quepa el servicio en la misma línea.
       const sub = hourShort(a.starts_at) + (a.service_name? (' · '+a.service_name) : '');
-      const depTag = isPending ? '<span class="tl-dep">Depósito</span>' : '';
+      // Una membresía cancelada ya no paga la cita: se cobra normal.
+      const memOk = a.membership && !a.membership.cancelled;
+      const depTag = isPending ? '<span class="tl-dep">Depósito</span>' : (memOk ? '<span class="tl-dep tl-mem">Membresía</span>' : '');
       // FAB (3 puntos) solo en citas accionables.
       const fab = isActive ? '<button class="tl-fab" data-fab="1" aria-label="Acciones"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>' : '';
       h += '<div class="'+cls+'" data-id="'+esc(a.id)+'" data-st="'+esc(st)+'"'+
         ' data-price="'+(a.price_cents||0)+'" data-svc="'+esc(a.service_name||'')+'"'+
         ' data-name="'+esc(who)+'" data-phone="'+esc(a.client_phone||'')+'" data-when="'+esc(hourLabel(a.starts_at))+'"'+
         ' data-start="'+esc(a.starts_at)+'"'+
+        ' data-mem="'+esc(memOk ? a.membership.name : '')+'"'+
         ' data-dep-id="'+esc((a.deposit&&a.deposit.id)||'')+'" data-dep-method="'+esc((a.deposit&&a.deposit.method)||'')+'" data-dep-status="'+esc((a.deposit&&a.deposit.status)||'')+'" data-dep-manual="'+((a.deposit&&a.deposit.manual_validate)?'1':'')+'"'+
         ' style="top:'+top+'px;height:'+hgt+'px;background:'+esc(bg)+';border-left-color:'+esc(col)+'">'+
         fab+'<b>'+ico+esc(who)+'</b><small>'+depTag+esc(sub)+'</small></div>';
@@ -2707,8 +2712,10 @@ function tlOpenPopover(ev){
   // (no_show; el cliente pierde el depósito) y Cancelar. Para depósitos manuales
   // (efectivo / ATH al número) aparece "Validar depósito y aceptar": el negocio
   // confirma que recibió el pago y la cita pasa de pendiente a aceptada.
+  const mem = ev.dataset.mem||'';
   let html = '<h5>'+esc(ev.dataset.name||'Cita')+'</h5>'+
     '<p>'+esc(ev.dataset.when||'')+(svc?(' · '+esc(svc)):'')+'</p>'+
+    (mem ? '<p style="color:var(--green);font-weight:700">Pagada con la membresía '+esc(mem)+'</p>' : '')+
     (needsValidation ? '<button class="tl-validate" data-act="validate" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;padding:7px 10px;border:none;border-radius:9px;background:#0E8074;color:#fff;font-weight:700;font-size:12px;cursor:pointer;line-height:1.2">'+TL_SVG.done+'<span>Validar depósito y aceptar</span></button>' : '')+
     '<div class="tl-pop-main">'+
       '<button class="tl-m-done" data-act="completed">'+TL_SVG.done+'<span>Completar</span></button>'+
@@ -2750,7 +2757,7 @@ function tlOpenPopover(ev){
         return;
       }
       // "Completar": cobra y completa la cita (openCobro → status:completed).
-      if(act==='completed'){ tlClosePopover(); openCobro(id, svc, price); return; }
+      if(act==='completed'){ tlClosePopover(); openCobro(id, svc, price, mem); return; }
       // "Mover": reagendar la cita (modal → PATCH start_iso).
       if(act==='move'){ tlClosePopover(); openReschedule(id, ev.dataset.start, ev.dataset.name); return; }
       if(act==='no_show' || act==='cancel'){
@@ -3197,7 +3204,7 @@ function openMenu(){ var d=document.getElementById('mobDrawer'),b=document.getEl
 function closeMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.remove('open'); b.classList.remove('open'); if(h) h.setAttribute('aria-expanded','false'); }
 function buildMobnav(){
   const nav = document.getElementById('mobDrawer');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['#recepcionista.html','Recepcionista IA'],['#recupera.html','Recupera clientes'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['marketing','Marketing'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#membresias.html','Membresías'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['#recepcionista.html','Recepcionista IA'],['#recupera.html','Recupera clientes'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['marketing','Marketing'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
   // Móvil: drawer off-canvas (hamburguesa) en vez de una barra de pestañas.
   nav.innerHTML = items.map(function(it){
     return '<a data-v="'+it[0]+'">'+it[1]+'</a>';
@@ -3530,10 +3537,15 @@ function wirePayments(){
 const cobroModal = document.getElementById('cobroModal');
 let cobroId = null, cobroPrice = 0, cobroMethod = 'cash';
 
-function openCobro(id, servicio, priceCents){
+function openCobro(id, servicio, priceCents, membresia){
+  // Cubierta por una membresía: ya se pagó al comprarla, así que se cobra $0 (solo
+  // algo extra o la propina, si hay).
+  if(membresia) priceCents = 0;
   cobroId = id; cobroPrice = priceCents; cobroMethod = 'cash';
   clearAlert('cobroAlert');
-  document.getElementById('cobroServicio').textContent = servicio + ' — ' + money(priceCents);
+  document.getElementById('cobroServicio').textContent = membresia
+    ? servicio + ' — ya se pagó con la membresía ' + membresia + '. Cobra solo algo extra o la propina.'
+    : servicio + ' — ' + money(priceCents);
   document.getElementById('cobroAmt').value = (priceCents/100).toFixed(2);
   document.getElementById('cobroTip').value = '';
   document.querySelectorAll('.paymethod').forEach(function(b){ b.classList.toggle('on', b.dataset.m==='cash'); });

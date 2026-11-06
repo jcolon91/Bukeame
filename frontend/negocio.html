@@ -609,6 +609,11 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <span class="grow"><h4>Gift card</h4><p>Cómprala de regalo o consulta el saldo de tu tarjeta.</p></span>
         <span class="arr">→</span>
       </button>
+      <button class="action-card" id="openMem" style="display:none">
+        <span class="ic"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h5"/></svg></span>
+        <span class="grow"><h4>Membresías</h4><p>Paga por adelantado y usa tus visitas al reservar.</p></span>
+        <span class="arr">→</span>
+      </button>
       <button class="action-card" id="openWait">
         <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
         <span class="grow"><h4>Únete a la lista de espera</h4><p>Te avisamos si se abre un espacio en las fechas que quieres.</p></span>
@@ -734,6 +739,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <div class="field"><label>Tu nombre *</label><input id="cName" placeholder="Tu nombre completo"></div>
       <div class="field"><label>WhatsApp * (para el recordatorio)</label><input id="cPhone" type="tel" placeholder="787-555-1234"></div>
       <div class="field"><label>Email (opcional)</label><input id="cEmail" type="email" placeholder="tu@correo.com"><div style="font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45">El negocio te puede escribir por email de vez en cuando. Te das de baja con un toque.</div></div>
+      <div class="field" id="memField" style="display:none"><label>Código de membresía (opcional)</label><input id="cMem" placeholder="Si tienes membresía aquí" autocomplete="off" style="font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em"><div id="memMsg" style="font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45">Con tu código y el mismo teléfono de la compra, esta cita se paga con tu membresía.</div></div>
       <div class="field"><label>Nota (opcional)</label><textarea id="cNotes" rows="2" placeholder="Algo que el negocio deba saber"></textarea></div>
       <button class="btn btn-teal" id="confirmBtn">Confirmar reserva →</button>
     </section>
@@ -1706,7 +1712,65 @@ function goToConfirm(){
     '<div class="row tot"><span>Total</span><b>'+money(totalPrice)+'</b></div>'+
     (depNow > 0 ? '<div class="row dep-now"><span>Depósito para reservar</span><b>'+money(depNow)+'</b></div>' : '');
   goStep(3);
+  memState.ok = false;
+  if(document.getElementById('cMem').value.trim()) checkMem();
 }
+
+// ═══════════ MEMBRESÍA EN LA RESERVA ═══════════
+// El cliente escribe su código y, con el mismo teléfono de la compra, se revisa si
+// cubre esta cita (servicios y fecha). El servidor lo vuelve a revisar al reservar.
+var MEM_KEY = 'bk_mem_'+SLUG;
+var memState = { code:'', ok:false };
+try{ var _mc = localStorage.getItem(MEM_KEY); if(_mc) document.getElementById('cMem').value = _mc; }catch(e){}
+function memHelp(msg, kind){
+  var el = document.getElementById('memMsg');
+  el.textContent = msg;
+  el.style.color = kind==='ok' ? 'var(--teal-ink)' : (kind==='err' ? '#C0392B' : 'var(--muted)');
+  el.style.fontWeight = kind ? '600' : '';
+}
+function updateDepRow(){
+  var s = document.getElementById('summary'); if(!s) return;
+  var dep = s.querySelector('.dep-now'); if(dep) dep.style.display = memState.ok ? 'none' : '';
+  var mr = s.querySelector('.mem-row');
+  if(memState.ok && !mr){ mr = document.createElement('div'); mr.className = 'row mem-row'; mr.innerHTML = '<span>Pago</span><b>Con tu membresía</b>'; s.appendChild(mr); }
+  if(!memState.ok && mr) mr.remove();
+}
+// Lo que se revisó: si cambia el código, el teléfono, los servicios o la hora, se revisa otra vez.
+function memKey(){
+  return [document.getElementById('cMem').value.trim().toUpperCase(), document.getElementById('cPhone').value.replace(/\D/g,''),
+    state.selectedServices.map(function(s){ return s.id; }).join(','), state.startIso].join('|');
+}
+async function checkMem(){
+  var code = document.getElementById('cMem').value.trim().toUpperCase();
+  var phone = document.getElementById('cPhone').value.trim();
+  memState = { code:code, ok:false, key:memKey() };
+  updateDepRow();
+  if(!code){ memHelp('Con tu código y el mismo teléfono de la compra, esta cita se paga con tu membresía.'); return; }
+  if(phone.replace(/\D/g,'').length < 10){ memHelp('Escribe arriba tu WhatsApp (el mismo de la compra) para revisar tu membresía.'); return; }
+  memHelp('Revisando tu membresía…');
+  try{
+    var ids = state.selectedServices.map(function(s){ return s.id; });
+    var r = await fetch(API+'/public/'+encodeURIComponent(SLUG)+'/memberships/consulta',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ code:code, phone:phone, service_ids:ids, start_iso:state.startIso })
+    });
+    var d = await r.json().catch(function(){ return {}; });
+    if(code !== document.getElementById('cMem').value.trim().toUpperCase()) return;   // lo cambió mientras tanto
+    if(!r.ok){ memHelp(d.error || 'No pudimos revisar tu membresía. Intenta de nuevo.', 'err'); return; }
+    var m = d.membership || {};
+    memState.ok = !!d.covers;
+    var after = '';
+    if(d.covers && m.visits_left != null){
+      var left = Math.max(0, m.visits_left - ids.length);
+      after = left===0 ? ' Con esta, usas la última.' : (' Después te '+(left===1 ? 'queda 1' : 'quedan '+left)+'.');
+    }
+    memHelp((d.covers ? (m.name+': ') : '')+(d.message||'')+after, d.covers ? 'ok' : 'err');
+    updateDepRow();
+  }catch(e){ memHelp('No pudimos revisar tu membresía. Intenta de nuevo.', 'err'); }
+}
+document.getElementById('cMem').addEventListener('change', checkMem);
+document.getElementById('cMem').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); checkMem(); } });
+document.getElementById('cPhone').addEventListener('change', function(){ if(document.getElementById('cMem').value.trim()) checkMem(); });
 
 document.getElementById('back2').onclick = function(){ goStep(1); };
 document.getElementById('back3').onclick = function(){ goStep(2); };
@@ -1725,6 +1789,18 @@ document.getElementById('confirmBtn').onclick = async function(){
   if(state.staffId) body.staff_id = state.staffId;
   if(email) body.email = email;
   if(notes) body.client_notes = notes;
+  var memCode = document.getElementById('memField').style.display==='none' ? '' : document.getElementById('cMem').value.trim().toUpperCase();
+  // El código solo viaja si ya se revisó que cubre ESTA cita. Si no la cubre, se dice por
+  // qué y el cliente decide (un código viejo guardado no debe trancar la reserva sin avisar).
+  if(memCode){
+    if(memState.key !== memKey()) await checkMem();
+    if(!memState.ok){
+      var why = document.getElementById('memMsg').textContent || 'Tu membresía no cubre esta cita.';
+      showAlert('formAlert', why + (/borra el código/.test(why) ? '' : ' Para reservar sin la membresía, borra el código.'));
+      return;
+    }
+    body.membership_code = memCode;
+  }
   var _adcid = adCampaignId(); if(_adcid != null) body.ad_campaign_id = _adcid;
 
   var btn = document.getElementById('confirmBtn');
@@ -1741,6 +1817,7 @@ document.getElementById('confirmBtn').onclick = async function(){
     }
     var appt = data.appointment || data;
     state.appt = appt;
+    if(appt.membership){ try{ localStorage.setItem(MEM_KEY, memCode); }catch(e){} }
     // Depósito requerido: usar el del backend si viene, si no, sumar el de los servicios elegidos
     var depFromSvc = state.selectedServices.reduce(function(t,x){ return t + (x.deposit_cents||0); }, 0);
     var depCents = (appt.deposit_cents!=null ? appt.deposit_cents : (depositsOn() ? depFromSvc : 0)) || 0;
@@ -1774,7 +1851,9 @@ function showOkStep(appt){
   document.getElementById('okTitle').textContent = pending ? 'Reserva pendiente de depósito' : '¡Reserva confirmada!';
   document.getElementById('okDetail').textContent = pending
     ? state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'})+'. El negocio confirmará tu cita al validar el depósito. Tu turno queda reservado por 30 minutos: si el depósito no se valida a tiempo, se libera.'
-    : state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
+    : state.selectedServices.map(function(s){ return s.name; }).join(' + ')+' · '+when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'})+' a las '+when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'})
+      + (a.membership ? (' · Pagada con tu membresía '+a.membership.name
+          + (a.membership.visits_left!=null ? (a.membership.visits_left===0 ? ': era tu última visita.' : (': te '+(a.membership.visits_left===1 ? 'queda 1 visita.' : 'quedan '+a.membership.visits_left+' visitas.'))) : '.')) : '');
   document.getElementById('okCode').textContent = (appt&&appt.confirmation_code) || (state.appt&&state.appt.confirmation_code) || '—';
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
   document.getElementById('stepOk').classList.add('on');
@@ -1999,10 +2078,16 @@ function parseVariants(v){
 function renderMore(){
   var hasShop = !!(state.products && state.products.length);
   var hasWait = !!(state.biz && state.biz.waitlist_enabled);
+  var hasMem = !!(state.biz && state.biz.memberships_enabled);
+  // El código se puede usar mientras haya membresías vigentes, aunque ya no se vendan.
+  var useMem = !!(state.biz && (state.biz.memberships_redeem || state.biz.memberships_enabled));
   document.getElementById('openWait').style.display = hasWait ? '' : 'none';
   document.getElementById('checkGift').style.display = hasShop ? '' : 'none';
-  if(hasShop || hasWait) document.getElementById('sec-more').style.display = 'block';
+  document.getElementById('openMem').style.display = hasMem ? '' : 'none';
+  document.getElementById('memField').style.display = useMem ? '' : 'none';
+  if(hasShop || hasWait || hasMem) document.getElementById('sec-more').style.display = 'block';
 }
+document.getElementById('openMem').onclick = function(){ location.href = 'membresia.html?slug='+encodeURIComponent(SLUG); };
 
 function renderShop(){
   if(!state.products || state.products.length===0) return;

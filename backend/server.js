@@ -208,6 +208,22 @@ app.post('/api/payments/stripe/webhook',
           } catch (e) {}
         }
       }
+
+      // ── Membresías pagadas con tarjeta (metadata kind='membership') ─────────
+      // El negocio sale de la fila, nunca de metadata. El módulo exige que el pago venga
+      // de la cuenta Stripe de ESE negocio, por el monto exacto y ya cobrado (una sesión
+      // "unpaid" de un pago diferido espera al payment_intent.succeeded). Idempotente.
+      if (md.kind === 'membership' && isUuid(String(md.membership_id || '')) && sharedHelpers.membresias) {
+        try {
+          await sharedHelpers.membresias.activarPorTarjeta(String(md.membership_id), {
+            ref: extRef, account: event.account || null,
+            amount: Number(obj.amount_total != null ? obj.amount_total : (obj.amount_received != null ? obj.amount_received : obj.amount)),
+            currency: String(obj.currency || '').toLowerCase(),
+            paid: type === 'payment_intent.succeeded' ? obj.status === 'succeeded' : obj.payment_status === 'paid',
+          });
+        }
+        catch (e) { console.error('stripe membresía:', e.message); return res.status(500).json({ error: 'reintentar' }); }
+      }
     }
     // Firma válida ⇒ 200 siempre (aplique o no el evento).
     return res.json({ received: true });
@@ -2176,7 +2192,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   const biz = rows[0];
   if (!biz) return bad(res, 'Negocio no encontrado', 404);
 
-  const [services, staff, hours, reviews, payMethods, products, gallery] = await Promise.all([
+  const [services, staff, hours, reviews, payMethods, products, gallery, membresias] = await Promise.all([
     db.query(`SELECT id, name, description, duration_min, price_cents, deposit_cents, photo_url, is_featured
               FROM services WHERE business_id = $1 AND is_active AND deleted_at IS NULL
               ORDER BY is_featured DESC, sort_order`, [biz.id]),
@@ -2235,9 +2251,21 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
                   WHERE business_id = $1 ORDER BY sort_order`, [biz.id])
           .catch(() => ({ rows: [] }))
       : Promise.resolve({ rows: [] }),
+    // ¿Vende membresías? (add-on activo + alguna a la venta) y ¿hay membresías vigentes que
+    // se puedan usar al reservar? (aunque ya no venda: lo pagado se respeta). Resiliente sin la migración 38.
+    db.query(`SELECT EXISTS (SELECT 1 FROM membership_plans mp
+                              WHERE mp.business_id = $1 AND mp.is_active AND mp.archived_at IS NULL)
+                 AND EXISTS (SELECT 1 FROM addons a WHERE a.business_id = $1 AND a.code = 'memberships'
+                              AND a.status = 'active'
+                              AND (a.current_period_end IS NULL OR now() <= a.current_period_end + interval '7 days')) AS ok,
+                     EXISTS (SELECT 1 FROM memberships ms WHERE ms.business_id = $1 AND ms.status = 'active'
+                              AND ms.ends_at > now()) AS redeem`,
+      [biz.id]).catch(() => ({ rows: [{ ok: false, redeem: false }] })),
   ]);
   const payment_config = buildPaymentConfig(payMethods.rows);
   delete biz.branding_ok;   // uso interno (galería); no se expone
+  biz.memberships_enabled = !!membresias.rows[0].ok;
+  biz.memberships_redeem = !!(membresias.rows[0].ok || membresias.rows[0].redeem);
   res.json({
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
     payment_methods: payMethods.rows.map(r => r.provider),
@@ -2384,7 +2412,7 @@ app.get('/api/public/:slug/availability', publicLimiter, asyncH(async (req, res)
 
 // CREAR CITA (público, sin cuenta)
 app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, res) => {
-  const { service_id, staff_id, start_iso, full_name, phone, email, client_notes, payment_method, ad_campaign_id } = req.body || {};
+  const { service_id, staff_id, start_iso, full_name, phone, email, client_notes, payment_method, ad_campaign_id, membership_code } = req.body || {};
   // service_id puede ser uno (string) o varios (array). Normalizamos a lista.
   const serviceIds = (Array.isArray(service_id) ? service_id : String(service_id || '').split(','))
     .map(s => String(s).trim()).filter(isUuid);
@@ -2475,8 +2503,11 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
   // tiene monto > 0. NO depende de que el cliente mande payment_method (eso mataba
   // el depósito: nunca aparecía el paso de pago al agendar).
   const depositsOn = !!biz.deposits_enabled;
-  const deposit = depositsOn ? (service.deposit_cents || biz.deposit_default_cents || 0) : 0;
+  let deposit = depositsOn ? (service.deposit_cents || biz.deposit_default_cents || 0) : 0;
   const method = payment_method === 'card' ? 'card' : 'ath_movil';
+  const usaMembresia = isStr(membership_code, 40);
+  if (usaMembresia && !sharedHelpers.membresias)
+    return bad(res, 'Las membresías no están disponibles ahora mismo. Reserva sin el código o intenta en un rato.', 503);
   const phoneN = normPhone(phone);
 
   // ABUSE: tope de reservas ONLINE activas por cliente (teléfono) en este negocio.
@@ -2504,6 +2535,20 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
        RETURNING id, is_blocked`, [biz.id, full_name.trim(), phoneN, isEmail(email) ? email.toLowerCase() : null]);
     if (cl.rows[0].is_blocked) { await client.query('ROLLBACK'); return bad(res, 'No es posible reservar con este negocio', 403); }
 
+    // Membresía (código + el mismo teléfono): aparta sus visitas en esta misma
+    // transacción y la cita no pide depósito, porque ya está pagada.
+    let membresia = null;
+    if (usaMembresia) {
+      try {
+        membresia = await sharedHelpers.membresias.reservar(client, {
+          businessId: biz.id, code: membership_code, phoneN, serviceIds: services.map(s => s.id), starts });
+      } catch (e) {
+        if (e.membresia) { await client.query('ROLLBACK'); return bad(res, e.message, e.status); }
+        throw e;
+      }
+      deposit = 0;
+    }
+
     // intenta cada staff candidato; el EXCLUDE constraint resuelve carreras
     let appt = null;
     const code = confirmCode(biz.slug.replace(/[^a-z]/g, '').slice(0, 2).toUpperCase() || 'BK', starts);
@@ -2520,6 +2565,9 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
            deposit > 0 ? 'pending_deposit' : 'confirmed', code, (client_notes || '').slice(0, 300) || null,
            JSON.stringify(serviceDetail)]);
         appt = r.rows[0];
+        if (membresia)
+          await client.query(`UPDATE appointments SET membership_id = $2, membership_visits = $3 WHERE id = $1`,
+            [appt.id, membresia.id, membresia.visits]);
         break;
       } catch (e) {
         if (e.code === '23P01') continue;   // ese staff ya fue tomado → prueba el próximo
@@ -2568,6 +2616,7 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
         deposit_cents: appt.deposit_cents,
         payment_method: deposit > 0 ? method : null,
         ath_phone: deposit > 0 && method === 'ath_movil' ? biz.ath_phone : null,
+        membership: membresia ? { name: membresia.name, visits_left: membresia.visits_left } : null,
       },
     });
   } catch (e) { await client.query('ROLLBACK'); throw e; }
@@ -2578,6 +2627,7 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
 app.get('/api/public/appointments/:code', codeLimiter, asyncH(async (req, res) => {
   const { rows } = await db.query(
     `SELECT a.confirmation_code, a.status, a.starts_at, a.service_name, a.price_cents, a.deposit_cents,
+            to_jsonb(a)->>'membership_id' AS membership_id,
             st.display_name AS staff_name, a.business_id,
             b.name AS business_name, b.slug, b.address_line, b.cancellation_hours, b.ath_phone,
             (SELECT json_build_object('method', p.method, 'status', p.status, 'amount_cents', p.amount_cents)
@@ -2588,6 +2638,13 @@ app.get('/api/public/appointments/:code', codeLimiter, asyncH(async (req, res) =
       WHERE a.confirmation_code = $1`, [req.params.code.toUpperCase()]);
   const appt = rows[0];
   if (!appt) return bad(res, 'Cita no encontrada', 404);
+  // Pagada con membresía: cita.html lo dice para que el cliente no piense que debe algo.
+  appt.membership_name = null;
+  if (appt.membership_id) {
+    const ms = await db.query(`SELECT name FROM memberships WHERE id = $1`, [appt.membership_id]).catch(() => ({ rows: [] }));
+    appt.membership_name = ms.rows[0] ? ms.rows[0].name : null;
+  }
+  delete appt.membership_id;
   // cita.html arma los botones para pagar el depósito con esto. Antes no venía y la
   // tarjeta "Asegura tu cita" nunca aparecía (no había cómo pagar desde el enlace).
   if (appt.status === 'pending_deposit') {
@@ -3228,6 +3285,15 @@ app.get('/api/appointments', authRequired, businessScope, asyncH(async (req, res
       WHERE a.business_id = $1 AND a.starts_at >= $2 AND a.starts_at <= $3 ${extra}
       ORDER BY a.starts_at
       LIMIT 500`, vals);
+  // Citas cubiertas por una membresía: el negocio tiene que saber que ya están pagadas.
+  // Consulta aparte (y sin romper la agenda) por si la migración 38 aún no corrió.
+  const memIds = [...new Set(rows.map(r => r.membership_id).filter(Boolean))];
+  if (memIds.length) {
+    const ms = await db.query(`SELECT id, code, name, status FROM memberships WHERE business_id = $1 AND id = ANY($2::uuid[])`,
+      [req.business.id, memIds]).catch(() => ({ rows: [] }));
+    const by = Object.fromEntries(ms.rows.map(m => [m.id, { code: m.code, name: m.name, cancelled: m.status === 'cancelled' }]));
+    for (const r of rows) r.membership = r.membership_id ? (by[r.membership_id] || null) : null;
+  }
   if (rangeMode) return res.json({ from, to, appointments: rows });
   res.json({ date, appointments: rows });
 }));
@@ -3342,18 +3408,20 @@ app.patch('/api/appointments/:id', authRequired, businessScope, asyncH(async (re
       WHERE id = $2`, [status, appt.id]);
     if (status === 'completed') {
       // Monto REALMENTE cobrado: el negocio puede ajustarlo al completar (trabajo
-      // extra, ajuste de precio). Si no lo manda, se usa el precio del servicio.
+      // extra, ajuste de precio). Si no lo manda, se usa el precio del servicio, o $0
+      // si la cubrió una membresía (ya se pagó al comprarla).
       const amt = Number.isInteger(req.body?.amount_cents) && req.body.amount_cents >= 0 && req.body.amount_cents <= 100000000
-        ? req.body.amount_cents : appt.price_cents;
+        ? req.body.amount_cents : (appt.membership_id && appt.membership_visits ? 0 : appt.price_cents);
       await db.query(`UPDATE clients SET total_visits = total_visits + 1,
           total_spent_cents = total_spent_cents + $2, last_visit_at = now() WHERE id = $1`,
         [appt.client_id, amt]);
       // Registrar el pago de la cita (monto cobrado + propina) si se indicó método.
       // Evita duplicar si ya existe un pago 'balance' para esta cita.
       const method = ['cash','ath_movil','card'].includes(req.body?.payment_method) ? req.body.payment_method : null;
-      if (method) {
-        const tip = Number.isInteger(req.body?.tip_cents) && req.body.tip_cents >= 0 && req.body.tip_cents <= 100000000
-          ? req.body.tip_cents : 0;
+      const tip = Number.isInteger(req.body?.tip_cents) && req.body.tip_cents >= 0 && req.body.tip_cents <= 100000000
+        ? req.body.tip_cents : 0;
+      // Con $0 y sin propina no hay nada que anotar (antes daba error: el pago exige monto).
+      if (method && (amt > 0 || tip > 0)) {
         const exists = await db.query(
           `SELECT 1 FROM payments WHERE appointment_id = $1 AND kind = 'balance' LIMIT 1`, [appt.id]);
         if (!exists.rows[0]) {
@@ -4488,7 +4556,7 @@ const sharedHelpers = {
   vozLista, recuperaLista, addonVendible,
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
-  sendEmail, emailPlatformReceipt, emailReceipt, emailGiftCard,
+  sendEmail, sendWhatsApp, emailPlatformReceipt, emailReceipt, emailGiftCard,
   enqueueApptConfirm, alertOwner, fmtPR, oneLine, citaUrl,
   // 2FA/TOTP (crypto puro) para el panel admin:
   totp: {
@@ -4535,6 +4603,17 @@ try {
     Number(process.env.TARJETA_CONCILIAR_MS) || 3600_000);
 } catch (e) {
   console.error('⚠ Error montando el cobro con tarjeta:', e.message);
+}
+// Membresías (add-on): el negocio vende paquetes prepagados con sus términos. La reserva
+// pública y el webhook de Stripe lo usan por h.membresias. Cada hora vence, suelta las
+// que nunca se pagaron y manda los recordatorios de renovar.
+try {
+  sharedHelpers.membresias = require('./module-membresias').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  const revisarMembresias = () => sharedHelpers.membresias.revisar().catch(e => console.error('membresías:', e.message));
+  setTimeout(revisarMembresias, 150_000);
+  setInterval(revisarMembresias, Number(process.env.MEMBRESIAS_REVISAR_MS) || 3600_000);
+} catch (e) {
+  console.error('⚠ Error montando las membresías:', e.message);
 }
 
 // ============================================================================

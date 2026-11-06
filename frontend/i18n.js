@@ -14,7 +14,7 @@
   // (landing, búsqueda, reserva, acceso). Ampliable: añade pares aquí.
   var T = {
     // --- Navegación / panel ---
-    'Agenda':'Schedule','Servicios':'Services','Equipo':'Team','Clientes':'Clients','Lealtad':'Loyalty',
+    'Agenda':'Schedule','Servicios':'Services','Equipo':'Team','Clientes':'Clients','Lealtad':'Loyalty','Membresías':'Memberships',
     'Tienda':'Store','Lista de espera':'Waitlist','Órdenes':'Orders','Horario':'Hours','Contabilidad':'Accounting',
     'Mi negocio':'My business','Pagos':'Payments','Promociones':'Promotions','Marketing':'Marketing',
     'Referidos':'Referrals','Mi cuenta':'My account','Kit de marca':'Brand kit','Cerrar sesión':'Log out',

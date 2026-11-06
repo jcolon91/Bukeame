@@ -185,7 +185,9 @@ function renderDetail(a){
   const when = new Date(a.starts_at);
   document.getElementById('dDate').textContent = when.toLocaleDateString('es-PR',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('dTime').textContent = when.toLocaleTimeString('es-PR',{hour:'numeric',minute:'2-digit'});
-  document.getElementById('dPrice').textContent = money(a.price_cents);
+  document.getElementById('dPrice').textContent = a.membership_name
+    ? 'Pagada con tu membresía ' + a.membership_name
+    : money(a.price_cents);
   if(a.address_line){ document.getElementById('dAddrRow').style.display='flex'; document.getElementById('dAddr').textContent = a.address_line; }
   // mostrar botón cancelar solo si la cita está activa
   const active = (st==='confirmed' || st==='pending_deposit');
