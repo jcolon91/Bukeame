@@ -37,23 +37,48 @@ p b{color:var(--text)}
 <div class="wrap"><div class="card" id="card"><p>Cargando…</p></div></div>
 <script>
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-const t=new URLSearchParams(location.search).get('t')||'';
+// ?t=… viene del email (Recupera clientes); ?w=… viene de un aviso por WhatsApp (Difusiones).
+const qs=new URLSearchParams(location.search);
+const wa=!!qs.get('w');
+const t=(wa?qs.get('w'):qs.get('t'))||'';
+const ruta=wa?'/api/public/baja-wa/':'/api/public/baja/';
+const donde=wa?'mensaje de WhatsApp':'email';
 const card=document.getElementById('card');
 function listo(nombre){
-  card.innerHTML='<h1>Listo</h1><p>No te van a llegar más emails de <b>'+esc(nombre)+'</b>. Los avisos de tus citas por WhatsApp te siguen llegando como siempre.</p>';
+  if(!wa){ card.innerHTML='<h1>Listo</h1><p>No te van a llegar más emails de <b>'+esc(nombre)+'</b>. Los avisos de tus citas por WhatsApp te siguen llegando como siempre.</p>'; return; }
+  // WhatsApp: también puede salirse de los avisos de todos los negocios, o volver si fue un error.
+  card.innerHTML='<h1>Listo</h1><p>No te van a llegar más avisos de <b>'+esc(nombre)+'</b> por WhatsApp. Los recordatorios de tus citas te siguen llegando como siempre.</p>'
+    +'<p style="font-size:13.5px">¿Tampoco quieres avisos de otros negocios donde te has atendido?</p>'
+    +'<button class="btn" id="todos" type="button" style="margin-bottom:10px">No quiero avisos de ningún negocio</button><br>'
+    +'<button type="button" id="volver" style="font:inherit;font-size:13px;font-weight:700;color:var(--green);background:none;border:0;cursor:pointer;padding:6px 0">Me di de baja por error: quiero seguir recibiendo sus avisos</button>'
+    +'<div class="msg" id="msg"></div>';
+  document.getElementById('todos').onclick=async function(){
+    this.disabled=true;
+    const x=await fetch(ruta+t+'/todos',{method:'POST'}).catch(()=>null);
+    if(x&&x.ok){ card.innerHTML='<h1>Listo</h1><p>No te van a llegar avisos de ningún negocio por WhatsApp. Los recordatorios de tus citas te siguen llegando como siempre.</p>'; return; }
+    document.getElementById('msg').textContent='No pudimos hacerlo. Intenta de nuevo.'; this.disabled=false;
+  };
+  document.getElementById('volver').onclick=async function(){
+    this.disabled=true;
+    const x=await fetch(ruta+t+'/volver',{method:'POST'}).catch(()=>null);
+    if(x&&x.ok){ card.innerHTML='<h1>Listo</h1><p>Vas a seguir recibiendo los avisos de <b>'+esc(nombre)+'</b> por WhatsApp. Cada aviso trae este enlace por si cambias de idea.</p>'; return; }
+    document.getElementById('msg').textContent='No pudimos hacerlo. Intenta de nuevo.'; this.disabled=false;
+  };
 }
 (async function(){
-  if(!/^[0-9a-f-]{36}$/i.test(t)){ card.innerHTML='<h1>Enlace no válido</h1><p>Abre el enlace que viene al final del email.</p>'; return; }
+  if(!/^[0-9a-f-]{36}$/i.test(t)){ card.innerHTML='<h1>Enlace no válido</h1><p>Abre el enlace que viene al final del '+donde+'.</p>'; return; }
   let r,d={};
-  try{ r=await fetch('/api/public/baja/'+t); d=await r.json(); }catch(e){}
-  if(!r||!r.ok){ card.innerHTML='<h1>Enlace no válido</h1><p>'+esc(d.error||'Abre el enlace que viene al final del email.')+'</p>'; return; }
+  try{ r=await fetch(ruta+t); d=await r.json(); }catch(e){}
+  if(!r||!r.ok){ card.innerHTML='<h1>Enlace no válido</h1><p>'+esc(d.error||('Abre el enlace que viene al final del '+donde+'.'))+'</p>'; return; }
   if(d.unsubscribed){ listo(d.business_name); return; }
-  card.innerHTML='<h1>¿Ya no quieres sus emails?</h1><p>Vas a dejar de recibir los emails de <b>'+esc(d.business_name)+'</b> en '+esc(d.email)+'.</p>'
+  card.innerHTML=(wa
+      ?'<h1>¿Ya no quieres sus avisos?</h1><p>Vas a dejar de recibir los avisos de <b>'+esc(d.business_name)+'</b> por WhatsApp. Los recordatorios de tus citas te siguen llegando.</p>'
+      :'<h1>¿Ya no quieres sus emails?</h1><p>Vas a dejar de recibir los emails de <b>'+esc(d.business_name)+'</b> en '+esc(d.email)+'.</p>')
     +'<button class="btn" id="go" type="button">Darme de baja</button><div class="msg" id="msg"></div>';
   document.getElementById('go').onclick=async function(){
     this.disabled=true;
     try{
-      const x=await fetch('/api/public/baja/'+t,{method:'POST'}); const j=await x.json().catch(()=>({}));
+      const x=await fetch(ruta+t,{method:'POST'}); const j=await x.json().catch(()=>({}));
       if(x.ok){ listo(j.business_name||d.business_name); return; }
       document.getElementById('msg').textContent=j.error||'No se pudo. Intenta de nuevo.';
     }catch(e){ document.getElementById('msg').textContent='No se pudo. Revisa tu conexión e intenta de nuevo.'; }

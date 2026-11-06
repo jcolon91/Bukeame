@@ -2234,7 +2234,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
   const biz = rows[0];
   if (!biz) return bad(res, 'Negocio no encontrado', 404);
 
-  const [services, staff, hours, reviews, payMethods, products, gallery, membresias] = await Promise.all([
+  const [services, staff, hours, reviews, payMethods, products, gallery, membresias, difusiones] = await Promise.all([
     db.query(`SELECT id, name, description, duration_min, price_cents, deposit_cents, photo_url, is_featured
               FROM services WHERE business_id = $1 AND is_active AND deleted_at IS NULL
               ORDER BY is_featured DESC, sort_order`, [biz.id]),
@@ -2303,11 +2303,17 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
                      EXISTS (SELECT 1 FROM memberships ms WHERE ms.business_id = $1 AND ms.status = 'active'
                               AND ms.ends_at > now()) AS redeem`,
       [biz.id]).catch(() => ({ rows: [{ ok: false, redeem: false }] })),
+    // ¿Envía avisos por WhatsApp? (add-on Difusiones): la reserva enseña la casilla para aceptarlos.
+    db.query(`SELECT EXISTS (SELECT 1 FROM addons a WHERE a.business_id = $1 AND a.code = 'broadcasts'
+                              AND a.status = 'active'
+                              AND (a.current_period_end IS NULL OR now() <= a.current_period_end + interval '7 days')) AS ok`,
+      [biz.id]).catch(() => ({ rows: [{ ok: false }] })),
   ]);
   const payment_config = buildPaymentConfig(payMethods.rows);
   delete biz.branding_ok;   // uso interno (galería); no se expone
   biz.memberships_enabled = !!membresias.rows[0].ok;
   biz.memberships_redeem = !!(membresias.rows[0].ok || membresias.rows[0].redeem);
+  biz.broadcasts_enabled = !!difusiones.rows[0].ok;
   res.json({
     business: biz, services: services.rows, staff: staff.rows, hours: hours.rows, reviews: reviews.rows,
     payment_methods: payMethods.rows.map(r => r.provider),
@@ -2454,7 +2460,7 @@ app.get('/api/public/:slug/availability', publicLimiter, asyncH(async (req, res)
 
 // CREAR CITA (público, sin cuenta)
 app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, res) => {
-  const { service_id, staff_id, start_iso, full_name, phone, email, client_notes, payment_method, ad_campaign_id, membership_code } = req.body || {};
+  const { service_id, staff_id, start_iso, full_name, phone, email, client_notes, payment_method, ad_campaign_id, membership_code, promo_opt_in } = req.body || {};
   // service_id puede ser uno (string) o varios (array). Normalizamos a lista.
   const serviceIds = (Array.isArray(service_id) ? service_id : String(service_id || '').split(','))
     .map(s => String(s).trim()).filter(isUuid);
@@ -2633,6 +2639,19 @@ app.post('/api/public/:slug/appointments', bookingLimiter, asyncH(async (req, re
          VALUES ($1,$2,'email',$3,'confirm')`, [biz.id, appt.id, email.toLowerCase()]);
 
     await client.query('COMMIT');
+
+    // Marcó la casilla de avisos por WhatsApp (Difusiones). Solo si el negocio envía avisos
+    // y la persona NO se había dado de baja: cualquiera puede reservar con un teléfono
+    // ajeno, así que una baja solo se deshace con el enlace de su propio mensaje. Fuera de
+    // la transacción y sin romper la reserva (por si la migración 39 aún no corrió).
+    if (promo_opt_in === true)
+      await db.query(
+        `UPDATE clients SET wa_promo_opt_in_at = now(), wa_promo_source = 'reserva'
+          WHERE id = $1
+            AND NOT (wa_promo_opt_out_at IS NOT NULL AND (wa_promo_opt_in_at IS NULL OR wa_promo_opt_out_at >= wa_promo_opt_in_at))
+            AND EXISTS (SELECT 1 FROM addons a WHERE a.business_id = $2 AND a.code = 'broadcasts'
+                AND a.status = 'active' AND (a.current_period_end IS NULL OR now() <= a.current_period_end + interval '7 days'))`,
+        [cl.rows[0].id, biz.id]).catch(e => console.error('aviso whatsapp (permiso):', e.message));
 
     await alertNewAppointment(biz.id, appt.id,
       `${full_name.trim()} · ${service.name} · ${starts.toLocaleString('es-PR', { timeZone: 'America/Puerto_Rico', dateStyle: 'short', timeStyle: 'short' })}`,
@@ -3548,10 +3567,32 @@ app.get('/api/clients/:id', authRequired, businessScope, asyncH(async (req, res)
   if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
   const c = await db.query(
     `SELECT id, full_name, phone, email, notes, no_show_count, total_visits,
-            total_spent_cents, last_visit_at, is_blocked, created_at
+            total_spent_cents, last_visit_at, is_blocked, created_at,
+            to_jsonb(clients) AS _raw
        FROM clients WHERE id = $1 AND business_id = $2`, [req.params.id, req.business.id]);
   if (!c.rows[0]) return bad(res, 'Cliente no encontrado', 404);
   const client = c.rows[0];
+  // Avisos por WhatsApp (Difusiones): 'in' aceptó, 'out' se dio de baja él mismo, 'none'
+  // nunca. Se lee del jsonb para no romper el perfil si la migración 39 aún no corrió.
+  const raw = client._raw || {};
+  delete client._raw;
+  if ('wa_promo_opt_in_at' in raw) {
+    const inAt = raw.wa_promo_opt_in_at ? new Date(raw.wa_promo_opt_in_at) : null;
+    const outAt = raw.wa_promo_opt_out_at ? new Date(raw.wa_promo_opt_out_at) : null;
+    client.wa_promo = { state: outAt && (!inAt || outAt >= inAt) ? 'out' : (inAt ? 'in' : 'none'), source: raw.wa_promo_source || null };
+    // ¿De verdad le llegan? Hace falta una cita completada y, si el sí lo marcó el negocio,
+    // prueba de que es su cliente (mismo criterio que module-difusiones).
+    if (client.wa_promo.state === 'in') {
+      const p = await db.query(
+        `SELECT EXISTS (SELECT 1 FROM appointments ap WHERE ap.client_id = $1 AND ap.business_id = $2 AND ap.status = 'completed') AS atendido,
+                (EXISTS (SELECT 1 FROM appointments ap WHERE ap.client_id = $1 AND ap.business_id = $2 AND ap.status = 'completed' AND ap.source = 'online')
+                 OR EXISTS (SELECT 1 FROM message_log ml WHERE ml.business_id = $2 AND ml.channel = 'whatsapp' AND ml.recipient = $3
+                              AND ml.status IN ('sent','delivered') AND ml.appointment_id IS NOT NULL)) AS prueba`,
+        [client.id, req.business.id, client.phone]).catch(() => ({ rows: [{ atendido: true, prueba: true }] }));
+      client.wa_promo.ready = !!(p.rows[0].atendido && (client.wa_promo.source !== 'negocio' || p.rows[0].prueba));
+      client.wa_promo.missing = !p.rows[0].atendido ? 'cita' : (client.wa_promo.ready ? null : 'prueba');
+    }
+  }
 
   const [upcoming, past, gifts, loyalty] = await Promise.all([
     // Próximas: citas vivas a futuro
@@ -3601,6 +3642,27 @@ app.get('/api/clients/:id', authRequired, businessScope, asyncH(async (req, res)
 
 app.patch('/api/clients/:id', authRequired, businessScope, asyncH(async (req, res) => {
   if (!isUuid(req.params.id)) return bad(res, 'ID inválido');
+  // Avisos por WhatsApp: el negocio marca que el cliente le dijo que sí (o lo quita). Si
+  // el cliente se dio de baja él mismo, solo él puede volver a aceptar (casilla al reservar).
+  if (typeof (req.body || {}).wa_promo === 'boolean') {
+    const on = req.body.wa_promo;
+    const cur = await db.query(`SELECT wa_promo_opt_in_at, wa_promo_opt_out_at FROM clients WHERE id = $1 AND business_id = $2`,
+      [req.params.id, req.business.id]);
+    if (!cur.rows[0]) return bad(res, 'No encontramos ese cliente. Refresca la página e intenta de nuevo.', 404);
+    const k = cur.rows[0];
+    const deBaja = k.wa_promo_opt_out_at && (!k.wa_promo_opt_in_at || k.wa_promo_opt_out_at >= k.wa_promo_opt_in_at);
+    const BAJA_MSG = 'Este cliente se dio de baja de tus avisos. Solo esa persona puede volver a aceptarlos, desde el enlace del último aviso que le llegó.';
+    if (on && deBaja) return bad(res, BAJA_MSG, 409);
+    // La condición de baja va también en el UPDATE: si se da de baja justo ahora, gana la baja.
+    const u = await db.query(on
+      ? `UPDATE clients SET wa_promo_opt_in_at = now(), wa_promo_source = 'negocio' WHERE id = $1 AND business_id = $2
+           AND NOT (wa_promo_opt_out_at IS NOT NULL AND (wa_promo_opt_in_at IS NULL OR wa_promo_opt_out_at >= wa_promo_opt_in_at))`
+      : `UPDATE clients SET wa_promo_opt_in_at = NULL, wa_promo_source = NULL WHERE id = $1 AND business_id = $2`,
+      [req.params.id, req.business.id]);
+    if (on && !u.rowCount) return bad(res, BAJA_MSG, 409);
+    await audit(req, on ? 'client.wa_promo_on' : 'client.wa_promo_off', 'client', req.params.id);
+    if (Object.keys(req.body).length === 1) return res.json({ ok: true });
+  }
   const allowed = ['full_name','email','notes','is_blocked'];
   const sets = [], vals = [];
   for (const k of allowed) if (k in (req.body || {})) { vals.push(req.body[k]); sets.push(`${k} = $${vals.length}`); }
@@ -4592,10 +4654,24 @@ const recuperaLista = () => !!(RESEND_API_KEY && process.env.EMAIL_FROM_CAMPANAS
 const addonVendible = (code) => {
   if (String(code) === 'ai_receptionist') return vozLista();
   if (String(code) === 'win_back') return recuperaLista();
+  // Difusiones: sin WhatsApp configurado no hay por dónde enviar.
+  if (String(code) === 'broadcasts') return !!(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY);
   return true;
 };
+// Los espacios libres de un servicio en un día (todos los profesionales que lo dan),
+// igual que la reserva pública. Lo usan los avisos de "espacios de la semana".
+async function slotsDelDia(biz, serviceId, dateStr) {
+  const today = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' }));
+  if (new Date(`${dateStr}T12:00:00${TZ_OFFSET}`) > new Date(today.getTime() + biz.booking_horizon_days * 864e5)) return [];
+  const sv = await db.query(`SELECT duration_min FROM services WHERE id = $1 AND business_id = $2 AND is_active`, [serviceId, biz.id]);
+  if (!sv.rows[0]) return [];
+  const all = new Set();
+  for (const id of await eligibleStaff(biz.id, serviceId, dateStr))
+    (await staffDaySlots(biz, id, dateStr, sv.rows[0].duration_min)).forEach(s => all.add(s));
+  return [...all].sort();
+}
 const sharedHelpers = {
-  vozLista, recuperaLista, addonVendible,
+  vozLista, recuperaLista, addonVendible, slotsDelDia,
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
   confirmCode, bookingLimiter, codeLimiter, publicLimiter,
   sendEmail, sendWhatsApp, emailPlatformReceipt, emailReceipt, emailGiftCard,
@@ -4656,6 +4732,22 @@ try {
   setInterval(revisarMembresias, Number(process.env.MEMBRESIAS_REVISAR_MS) || 3600_000);
 } catch (e) {
   console.error('⚠ Error montando las membresías:', e.message);
+}
+// Difusiones (add-on): avisos por WhatsApp a los clientes que aceptaron. Salen del número
+// de los recordatorios, así que van de uno en uno con pausa al azar (DIFUSION_PAUSA_MS,
+// 20 s por defecto) para no parecer spam.
+try {
+  const difusiones = require('./module-difusiones').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  const pausa = Number(process.env.DIFUSION_PAUSA_MS) || 20_000;
+  const vuelta = async () => {
+    let r = { idle: true };
+    try { r = await difusiones.enviarSiguiente(); } catch (e) { console.error('difusiones:', e.message); }
+    // Sin nada que enviar se revisa cada 3 pausas (1 minuto); enviando, la pausa va de 0.75× a 1.5×.
+    setTimeout(vuelta, r && r.idle ? pausa * 3 : Math.round(pausa * (0.75 + Math.random() * 0.75)));
+  };
+  setTimeout(vuelta, pausa * 4.5);
+} catch (e) {
+  console.error('⚠ Error montando las difusiones:', e.message);
 }
 
 // ============================================================================

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Difusiones por WhatsApp — Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Difusiones por WhatsApp en Bukéame: avísales a tus clientes los espacios de la semana, una oferta o una noticia.">
+<meta name="theme-color" content="#0E8074">
+<link rel="canonical" href="https://bukeame.com/difusiones.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);--warn-ink:#8a5a13;--warn-bg:#FBEFD8;--red:#C0392B;
+--wa-bg:#E7DFD4;--wa-bubble:#FFFFFF;--wa-ink:#111B21;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{color-scheme:dark;
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);--warn-ink:#EFB85C;--warn-bg:rgba(239,161,47,.18);--red:#FF8F80;
+--wa-bg:#0B141A;--wa-bubble:#1F2C34;--wa-ink:#E9EDEF;
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px;padding:20px;text-align:center}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .spacer{flex:1}
+.theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:640px;margin:0 auto;padding:24px 16px 60px}
+h1{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.025em;margin-bottom:5px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:22px;line-height:1.5}
+.seclabel{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:26px 0 10px}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}
+.card h2{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.015em;margin-bottom:4px}
+.card .lead{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:14px;padding:12px 18px;border-radius:13px;background:var(--green);color:var(--green-ink);transition:filter .15s}
+.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.55;cursor:default}
+.btn-ghost{background:var(--card-soft);color:var(--text);border:1.5px solid var(--border);padding:9px 13px;font-size:13px;border-radius:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.btn-ghost:disabled{opacity:.5;cursor:default}
+.btn-ghost.danger{color:var(--red)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:14px}
+.stat b{display:block;font-family:var(--mono);font-weight:700;font-size:22px;color:var(--green)}
+.stat span{font-size:12px;color:var(--muted);line-height:1.35;display:block;margin-top:2px}
+textarea{width:100%;font:inherit;font-size:14.5px;line-height:1.5;padding:12px 13px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text);resize:vertical;min-height:150px}
+select{font:inherit;font-size:13.5px;padding:9px 10px;border-radius:11px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text);max-width:100%}
+textarea:focus,select:focus{outline:2px solid var(--green);outline-offset:1px;border-color:transparent}
+.count{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-align:right;margin-top:5px}
+.count.over{color:var(--red);font-weight:700}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.wa{background:var(--wa-bg);border-radius:16px;padding:14px;margin:12px 0}
+.wa .bubble{background:var(--wa-bubble);color:var(--wa-ink);border-radius:4px 12px 12px 12px;padding:10px 12px;font-size:14px;line-height:1.45;white-space:pre-wrap;word-break:break-word;max-width:94%;box-shadow:0 1px 1px rgba(0,0,0,.12)}
+.wa .lbl{font-size:11px;color:var(--muted);margin-bottom:6px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.sendrow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:6px}
+.sendrow .who{font-size:13px;color:var(--muted);line-height:1.45;flex:1;min-width:200px}
+.sendrow .who b{color:var(--text)}
+.item{padding:14px 0;border-top:1px solid var(--border)}
+.item:first-child{border-top:0;padding-top:2px}
+.item .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.item .when{font-weight:700;font-size:14px}
+.item p{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:4px}
+.item .txt{font-size:13px;color:var(--text);white-space:pre-wrap;margin-top:6px;max-height:4.6em;overflow:hidden}
+.badge{font-size:10.5px;font-weight:700;font-family:var(--mono);letter-spacing:.02em;padding:2px 8px;border-radius:99px;background:var(--card-soft);color:var(--muted);white-space:nowrap}
+.badge.ok{background:var(--green-soft);color:var(--green)}
+.badge.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.badge.dead{background:rgba(192,57,43,.12);color:var(--red)}
+.bar{height:7px;border-radius:99px;background:var(--card-soft);overflow:hidden;margin:8px 0 2px;max-width:280px}
+.bar span{display:block;height:100%;background:var(--green);border-radius:99px}
+.empty{text-align:center;color:var(--muted);font-size:13.5px;padding:22px 10px;line-height:1.6}
+.alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:12px;margin-bottom:12px;line-height:1.45}
+.alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;border-color:rgba(225,75,60,.35)}
+.alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--green-glow)}
+.warnbox{background:var(--warn-bg);color:var(--warn-ink);border-radius:14px;padding:13px 15px;font-size:13px;line-height:1.5;margin-bottom:12px}
+.warnbox a{text-decoration:underline;font-weight:700}
+.howto{font-size:13px;line-height:1.55;color:var(--muted)}
+.howto b{color:var(--text)}
+.locked{text-align:center;padding:36px 24px;background:linear-gradient(135deg,#0E8074,#0A5B52);color:#fff;border-radius:22px;box-shadow:0 12px 36px var(--green-glow)}
+html[data-theme="dark"] .locked{background:linear-gradient(135deg,#2BC56A,#36E27B);color:#08160F}
+.locked .ic{width:54px;height:54px;margin:0 auto 14px;border-radius:16px;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.locked h2{font-family:var(--display);font-weight:800;font-size:23px;letter-spacing:-.02em;margin-bottom:8px}
+.locked p{font-size:14px;opacity:.92;line-height:1.55;margin-bottom:16px;text-align:left}
+.locked .price{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em}
+.locked .price-sub{font-size:13px;opacity:.85;margin:2px 0 20px}
+.locked a{display:inline-block;background:var(--card);color:var(--green);font-weight:700;font-size:14px;padding:13px 24px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.modal{position:fixed;inset:0;background:rgba(10,15,12,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}
+.modal.on{display:flex}
+.modal .box{background:var(--card);border-radius:18px;width:100%;max-width:420px;padding:20px}
+.modal .foot-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+@media(max-width:480px){.stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:span 2}}
+</style>
+<script src="bukeame-core.js"></script>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav"><a href="panel.html" class="back" aria-label="Volver al panel">←</a><span class="logo">Buk<i>é</i>ame</span><span class="spacer"></span><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap">
+  <h1>Difusiones por WhatsApp</h1>
+  <p class="sub">Avísales a tus clientes los espacios de la semana, una oferta o una noticia. Les llega a los que ya atendiste y aceptaron recibir avisos.</p>
+  <div id="content"></div>
+</div>
+</div>
+<div class="modal" id="askModal" role="dialog" aria-modal="true" aria-labelledby="askText">
+  <div class="box">
+    <p id="askText" style="font-size:14.5px;line-height:1.55"></p>
+    <div class="foot-btns"><button type="button" class="btn-ghost" id="askNo">No</button><button type="button" class="btn" id="askYes" style="padding:10px 16px;font-size:13.5px">Sí</button></div>
+  </div>
+</div>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+const API='/api';
+const token=localStorage.getItem('bukeame_token');
+if(!token){ location.href='acceso.html'; }
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const r=await fetch(API+path,opts);
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
+const ICON_WA='<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 1 1 21 11.5z"/></svg>';
+const num=n=>Number(n||0).toLocaleString('es-PR');
+const fechaHora=s=>{ try{ return new Date(s).toLocaleString('es-PR',{timeZone:'America/Puerto_Rico',weekday:'long',day:'numeric',month:'long',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } };
+const plural=(n,a,b)=>n===1?a:b;
+const ST={ pending_review:['Lo revisa Bukéame','warn'], queued:['En la fila','warn'], sending:['Enviando','warn'], sent:['Enviado','ok'], stopped:['Detenido','dead'], rejected:['No aprobado','dead'] };
+let S=null, timer=null, prevT=null;
+
+function askConfirm(text,yes){
+  return new Promise(res=>{
+    const m=document.getElementById('askModal');
+    document.getElementById('askText').textContent=text;
+    document.getElementById('askYes').textContent=yes||'Sí';
+    m.classList.add('on');
+    const done=v=>{ m.classList.remove('on'); res(v); };
+    document.getElementById('askYes').onclick=()=>done(true);
+    document.getElementById('askNo').onclick=()=>done(false);
+  });
+}
+function showAlert(id,msg,ok){ const el=document.getElementById(id); if(!el) return; el.textContent=msg; el.className='alert '+(ok?'ok':'err'); }
+function clearAlert(id){ const el=document.getElementById(id); if(el) el.className='alert'; }
+
+async function load(){
+  const r=await api('GET','/broadcasts');
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+  if(!r.ok){ document.getElementById('content').innerHTML='<div class="card"><div class="empty">'+esc((r.data&&r.data.error)||'No pudimos cargar tus avisos. Intenta de nuevo en un rato.')+'</div></div>'; return; }
+  S=r.data; render();
+}
+async function reload(){
+  const r=await api('GET','/broadcasts');
+  if(r.ok){ S=r.data; renderStats(); renderHist(); renderGate(); }
+}
+
+function render(){
+  const c=document.getElementById('content');
+  if(!S.addon_active && !S.broadcasts.length){
+    c.innerHTML='<div class="locked"><div class="ic">'+ICON_WA+'</div><h2>Difusiones por WhatsApp</h2>'+
+      '<p>Escribe un aviso (los espacios que te quedan esta semana, una oferta o una noticia del negocio) y les llega por WhatsApp a los clientes que ya atendiste y aceptaron recibirlos. Con un toque pones tus espacios libres de los próximos 7 días.</p>'+
+      '<div class="price">$4.99 al mes</div><div class="price-sub">Trae '+num(S.quota.included)+' mensajes al mes. Lo cancelas cuando quieras en Mi cuenta.</div>'+
+      '<a href="panel.html#cuenta" class="ios-hide-purchase">Activar en Mi cuenta</a></div>';
+    return;
+  }
+  c.innerHTML=
+    (!S.addon_active ? '<div class="warnbox">Tu add-on Difusiones por WhatsApp no está activo, así que no puedes enviar avisos nuevos. <a href="panel.html#cuenta">Activar en Mi cuenta</a></div>' : '')+
+    (S.addon_active && (!S.whatsapp_ready || S.paused) ? '<div class="warnbox">Los avisos por WhatsApp están en pausa por ahora. Vuelve a intentar más tarde.</div>' : '')+
+    (S.blocked ? '<div class="warnbox">Tus avisos están en pausa mientras Bukéame revisa tu último aviso: '+esc(S.blocked.reason||'')+'. Escríbenos por WhatsApp si tienes dudas.</div>' : '')+
+    (S.addon_active && !S.blocked && S.needs_review ? '<div class="warnbox" style="background:var(--green-soft);color:var(--green)">Tu primer aviso lo revisa Bukéame antes de que salga (casi siempre el mismo día). Los siguientes salen sin esperar.</div>' : '')+
+    '<div class="stats" id="stats"></div>'+
+    '<div class="card"><h2>Cómo consigues que acepten</h2>'+
+      '<p class="howto">Solo les llega a los clientes que dijeron que sí. Así WhatsApp no lo trata como spam y tus clientes no se molestan. Pueden aceptar de dos maneras:<br>'+
+      '· <b>Al reservar en línea</b>, marcando la casilla "Quiero recibir avisos por WhatsApp".<br>'+
+      '· <b>En el negocio</b>, si te dicen que sí: lo marcas en Clientes, en su perfil. A esos les llega cuando ya reservaron en línea o les llegó el WhatsApp de una cita suya: así sabemos que el número es de tu cliente.<br>'+
+      'Cada aviso trae un enlace para darse de baja. Si alguien se da de baja, solo esa persona puede volver a aceptar. Si muchos se dan de baja de un mismo aviso, tus avisos quedan en pausa hasta que Bukéame los revise.</p></div>'+
+    '<div class="seclabel">Nuevo aviso</div>'+
+    '<div class="card" id="composer">'+
+      '<div class="alert" id="sendAlert"></div>'+
+      '<div class="tools"><button type="button" class="btn-ghost" id="slotsBtn">Poner mis espacios de los próximos días</button></div>'+
+      '<textarea id="body" maxlength="'+S.rules.max_length+'" placeholder="Ejemplo: Esta semana tenemos especial de recorte y barba a $25. ¡Te esperamos!"></textarea>'+
+      '<div class="count" id="count">0 / '+S.rules.max_length+'</div>'+
+      '<div class="wa"><div class="lbl">Así le llega</div><div class="bubble" id="preview">Escribe tu aviso para ver cómo le llega a tu cliente.</div></div>'+
+      '<div class="sendrow"><div class="who" id="who"></div><button type="button" class="btn" id="sendBtn" disabled>Enviar aviso</button></div>'+
+      '<p class="howto" style="margin-top:12px;font-size:12px">No pongas enlaces ni páginas web: Bukéame añade al final el enlace para reservar contigo. Los mensajes salen poco a poco y solo de día, así que llegarles a todos puede tomar un rato.</p>'+
+    '</div>'+
+    '<div class="seclabel">Avisos enviados</div>'+
+    '<div class="card" id="hist"></div>';
+  document.getElementById('body').oninput=onType;
+  document.getElementById('slotsBtn').onclick=fillSlots;
+  document.getElementById('sendBtn').onclick=send;
+  renderStats(); renderHist(); renderGate();
+}
+
+function renderStats(){
+  const el=document.getElementById('stats'); if(!el) return;
+  el.innerHTML='<div class="stat"><b>'+num(S.opted_in)+'</b><span>'+plural(S.opted_in,'cliente aceptó avisos','clientes aceptaron avisos')+'</span></div>'+
+    '<div class="stat"><b>'+num(S.attended_not_opted)+'</b><span>'+plural(S.attended_not_opted,'atendido que no ha dicho que sí','atendidos que no han dicho que sí')+'</span></div>'+
+    '<div class="stat"><b>'+num(S.quota.left)+'</b><span>'+plural(S.quota.left,'mensaje que te queda','mensajes que te quedan')+' este mes, de '+num(S.quota.included)+'</span></div>';
+}
+
+// ¿Se puede enviar ahora? Lo que falte se dice debajo del botón.
+function renderGate(){
+  const who=document.getElementById('who'), btn=document.getElementById('sendBtn');
+  if(!who) return;
+  const len=document.getElementById('body').value.trim().length;
+  let msg='', ok=true;
+  if(!S.addon_active){ ok=false; msg='Activa Difusiones por WhatsApp en Mi cuenta para enviar.'; }
+  else if(!S.whatsapp_ready || S.paused){ ok=false; msg='Los avisos están en pausa por ahora.'; }
+  else if(S.blocked){ ok=false; msg='Tus avisos están en pausa mientras Bukéame los revisa.'; }
+  else if(S.next_allowed_at){ ok=false; msg='Tu próximo aviso puede salir desde el '+fechaHora(S.next_allowed_at)+'. Entre un aviso y otro hay que esperar '+S.rules.min_days_between+' '+plural(S.rules.min_days_between,'día','días')+'.'; }
+  else if(!S.opted_in){ ok=false; msg='Todavía ningún cliente ha aceptado recibir avisos. Arriba ves cómo lograr que acepten.'; }
+  else if(!S.quota.left){ ok=false; msg='Ya usaste los mensajes de este mes. El mes que viene se renuevan.'; }
+  else {
+    const llega=Math.min(S.opted_in,S.quota.left);
+    msg='Llega a <b>'+num(llega)+' '+plural(llega,'cliente','clientes')+'</b>'+(llega<S.opted_in?(' ('+num(S.opted_in-llega)+' no '+plural(S.opted_in-llega,'cabe','caben')+': te '+plural(S.quota.left,'queda','quedan')+' '+num(S.quota.left)+' '+plural(S.quota.left,'mensaje','mensajes')+' este mes)'):'')+'.';
+  }
+  who.innerHTML=msg.replace(/m\.\./g,'m.');   // la hora termina en "p. m.": que no quede doble punto
+  btn.disabled=!ok||len<10||len>S.rules.max_length;
+}
+
+function onType(){
+  const t=document.getElementById('body').value, max=S.rules.max_length;
+  const c=document.getElementById('count'); c.textContent=t.length+' / '+max; c.classList.toggle('over',t.length>max);
+  renderGate();
+  clearTimeout(prevT);
+  prevT=setTimeout(preview,450);
+}
+async function preview(){
+  const t=document.getElementById('body').value.trim(), p=document.getElementById('preview');
+  if(t.length<10){ p.textContent='Escribe tu aviso para ver cómo le llega a tu cliente.'; clearAlert('sendAlert'); return; }
+  const r=await api('POST','/broadcasts/preview',{ body:t });
+  if(r.ok){ p.textContent=r.data.message; clearAlert('sendAlert'); }
+  else { showAlert('sendAlert',(r.data&&r.data.error)||'No pudimos mostrarte cómo le llega. Intenta de nuevo.'); document.getElementById('sendBtn').disabled=true; }
+}
+async function fillSlots(){
+  const b=document.getElementById('slotsBtn'); b.disabled=true; const old=b.textContent; b.textContent='Buscando tus espacios…';
+  const r=await api('GET','/broadcasts/espacios');
+  b.disabled=false; b.textContent=old;
+  if(!r.ok){ showAlert('sendAlert',(r.data&&r.data.error)||'No pudimos buscar tus espacios. Intenta de nuevo.'); return; }
+  if(!r.data.text){ showAlert('sendAlert', r.data.message||'No tienes espacios libres en los próximos 7 días.'); return; }
+  const ta=document.getElementById('body');
+  ta.value=r.data.text+'\n\n¡Separa el tuyo antes de que se llenen!';
+  onType(); preview();
+}
+async function send(){
+  const t=document.getElementById('body').value.trim();
+  const llega=Math.min(S.opted_in,S.quota.left);
+  if(!(await askConfirm('¿Enviar este aviso a '+num(llega)+' '+plural(llega,'cliente','clientes')+' por WhatsApp? Sale poco a poco y lo puedes detener mientras se envía.','Sí, enviarlo'))) return;
+  const b=document.getElementById('sendBtn'); b.disabled=true; b.textContent='Enviando…';
+  const r=await api('POST','/broadcasts',{ body:t });
+  b.textContent='Enviar aviso';
+  if(!r.ok){ showAlert('sendAlert',(r.data&&r.data.error)||'No pudimos enviarlo. Intenta de nuevo.'); renderGate(); return; }
+  document.getElementById('body').value='';
+  onType();
+  showAlert('sendAlert', r.data.status==='pending_review'
+    ? 'Listo. Tu primer aviso va para '+num(r.data.recipients)+' '+plural(r.data.recipients,'cliente','clientes')+'. Bukéame lo revisa y te avisamos cuando empiece a salir.'
+    : 'Listo. Tu aviso va para '+num(r.data.recipients)+' '+plural(r.data.recipients,'cliente','clientes')+'. Sale poco a poco; aquí abajo ves el progreso.',true);
+  await reload();
+}
+
+function renderHist(){
+  const el=document.getElementById('hist'); if(!el) return;
+  if(!S.broadcasts.length){ el.innerHTML='<div class="empty">Aquí vas a ver tus avisos cuando envíes el primero.</div>'; return; }
+  el.innerHTML=S.broadcasts.map((b,i)=>{
+    const st=ST[b.status]||[b.status,''];
+    const vivo=b.status==='queued'||b.status==='sending'||b.status==='pending_review';
+    const pct=b.audience_count?Math.round((b.sent_count+b.failed_count)*100/b.audience_count):0;
+    return '<div class="item"><div class="top"><span class="when">'+esc(fechaHora(b.created_at))+'</span><span class="badge '+st[1]+'">'+st[0]+'</span></div>'+
+      '<div class="txt">'+esc(b.body)+'</div>'+
+      (vivo?'<div class="bar"><span style="width:'+pct+'%"></span></div>':'')+
+      '<p>Enviados: '+num(b.sent_count)+' de '+num(b.audience_count)+
+        (b.failed_count?' · '+num(b.failed_count)+' no se '+plural(b.failed_count,'pudo','pudieron')+' enviar':'')+
+        (b.opted_out?' · '+num(b.opted_out)+' se '+plural(b.opted_out,'dio','dieron')+' de baja':'')+
+        (b.capped?' · '+num(b.capped)+' no '+plural(b.capped,'cupo','cupieron')+' en los mensajes del mes':'')+
+        (b.stop_reason?' · '+esc(b.stop_reason):'')+
+        (b.review_note?' · Bukéame: '+esc(b.review_note):'')+'</p>'+
+      (vivo?'<div style="margin-top:8px"><button type="button" class="btn-ghost danger" data-stop="'+i+'">Detener el envío</button></div>':'')+
+    '</div>';
+  }).join('');
+  el.querySelectorAll('[data-stop]').forEach(btn=>btn.onclick=async()=>{
+    const b=S.broadcasts[+btn.dataset.stop];
+    if(!(await askConfirm('¿Detener este aviso? A los que faltan ya no les sale. A los que ya les llegó, no se les puede borrar.','Sí, detenerlo'))) return;
+    btn.disabled=true;
+    const r=await api('POST','/broadcasts/'+b.id+'/stop');
+    if(!r.ok) showAlert('sendAlert',(r.data&&r.data.error)||'No pudimos detenerlo. Intenta de nuevo.');
+    await reload();
+  });
+  // Mientras haya uno saliendo, se refresca solo.
+  clearTimeout(timer);
+  if(S.broadcasts.some(b=>b.status==='queued'||b.status==='sending'||b.status==='pending_review')) timer=setTimeout(reload,15000);
+}
+
+load().catch(()=>{ document.getElementById('boot').textContent='No pudimos cargar tus avisos. Revisa tu conexión e intenta de nuevo.'; });
+</script>
+</body>
+</html>

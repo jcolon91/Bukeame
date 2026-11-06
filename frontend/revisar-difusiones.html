@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Revisar avisos — Bukéame Admin</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--green:#0E8074;--green-ink:#FFFFFF;--green-soft:#E3EFE9;--warn-ink:#8a5a13;--warn-bg:#FBEFD8;--red:#C0392B;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{color-scheme:dark;
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--green:#36E27B;--green-ink:#08160F;--green-soft:rgba(54,226,123,.12);--warn-ink:#EFB85C;--warn-bg:rgba(239,161,47,.18);--red:#FF8F80;
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px;text-decoration:none}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .tag{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.wrap{max-width:900px;margin:0 auto;padding:24px 16px 60px}
+h1{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.025em;margin-bottom:5px}
+.sub{font-size:13.5px;color:var(--muted);margin-bottom:20px;line-height:1.5;max-width:680px}
+.seclabel{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:26px 0 12px}
+.seclabel::after{content:"";flex:1;height:1px;background:var(--border)}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}
+.card h2{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.015em}
+.meta{font-size:13px;color:var(--muted);line-height:1.55;margin:4px 0 10px}
+.body{white-space:pre-wrap;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 13px;font-size:14px;line-height:1.5;margin-bottom:12px}
+.facts{font-size:12.5px;line-height:1.55;color:var(--muted);margin-bottom:12px}
+.facts b{color:var(--text)}
+input[type=text]{width:100%;font:inherit;font-size:14px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text)}
+input:focus{outline:2px solid var(--green);outline-offset:1px;border-color:transparent}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13.5px;padding:11px 16px;border-radius:13px;background:var(--green);color:var(--green-ink)}
+.btn:disabled{opacity:.55;cursor:default}
+.btn-ghost{background:var(--card-soft);color:var(--text);border:1.5px solid var(--border);padding:10px 14px;font-size:13px;border-radius:12px;font-weight:600}
+.btn-ghost.danger{color:var(--red)}
+.msg{font-size:12.5px;color:var(--muted);margin-top:8px;min-height:1em}
+.warnbox{background:var(--warn-bg);color:var(--warn-ink);border-radius:14px;padding:13px 15px;font-size:13px;line-height:1.5;margin-bottom:12px}
+.empty{color:var(--muted);font-size:13.5px;padding:14px 4px;line-height:1.6}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--border)}
+td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+td.num{font-family:var(--mono);font-weight:600}
+.scrollx{overflow-x:auto}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+</style>
+</head>
+<body>
+<script>(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+<nav class="nav"><a href="admin.html" class="back" aria-label="Volver al admin">←</a><span class="logo">Buk<i>é</i>ame</span><span class="tag">Admin</span></nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap">
+  <h1>Avisos por WhatsApp</h1>
+  <p class="sub">Salen del mismo número de los recordatorios de citas. Aquí se aprueba el primer aviso de cada negocio y se quita la pausa a los que tuvieron muchas bajas o números malos. Mira que el texto sea del negocio, sin promesas raras, y que el público tenga sentido para su tamaño.</p>
+  <div id="estado"></div>
+  <div class="seclabel">Primeros avisos por aprobar</div>
+  <div id="pend"><div class="empty">Cargando…</div></div>
+  <div class="seclabel">Negocios en pausa</div>
+  <div id="bloq"></div>
+  <div class="seclabel">Recientes</div>
+  <div class="card"><div class="scrollx" id="rec"></div></div>
+</div>
+<div class="foot">Bukéame · revisión de Wifnix</div>
+<script>
+const API='/api';
+const token=localStorage.getItem('bukeame_token');
+if(!token){ location.href='acceso.html'; }
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const r=await fetch(API+path,opts);
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  return {status:r.status,ok:r.ok,data};
+}
+const fecha=s=>{ try{ return new Date(s).toLocaleString('es-PR',{timeZone:'America/Puerto_Rico',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } };
+const ST={ queued:'En la fila', sending:'Enviando', sent:'Enviado', stopped:'Detenido', rejected:'No aprobado' };
+
+async function load(){
+  const r=await api('GET','/admin/broadcasts');
+  if(r.status===403){ document.querySelector('.wrap').innerHTML='<div class="warnbox">Esta página es solo para el administrador de Bukéame.</div>'; return; }
+  if(!r.ok){ document.getElementById('pend').innerHTML='<div class="empty">No pudimos cargar. Intenta de nuevo.</div>'; return; }
+  const d=r.data;
+  document.getElementById('estado').innerHTML=
+    (d.paused?'<div class="warnbox">Los avisos están en pausa para todos (DIFUSIONES_PAUSA o WhatsApp sin configurar).</div>':'')+
+    '<div class="card"><div class="meta" style="margin:0">Hoy salieron <b>'+d.today.sent+'</b> de un tope de <b>'+d.today.cap+'</b> avisos para todo Bukéame.</div></div>';
+
+  document.getElementById('pend').innerHTML = d.pending.length ? d.pending.map(p=>
+    '<div class="card" data-id="'+esc(p.id)+'"><h2>'+esc(p.business_name)+'</h2>'+
+      '<div class="meta">'+esc(fecha(p.created_at))+' · <a href="negocio.html?slug='+encodeURIComponent(p.slug)+'" target="_blank" rel="noopener">ver su página</a></div>'+
+      '<div class="body">'+esc(p.body)+'</div>'+
+      '<div class="facts">Le llega a <b>'+p.audience_count+'</b> clientes de los <b>'+p.clientes_total+'</b> que tiene el negocio. '+
+        '<b>'+p.por_negocio+'</b> de ellos los marcó el negocio a mano (los demás marcaron la casilla al reservar).</div>'+
+      '<div class="field"><input type="text" class="note" maxlength="300" placeholder="Si no lo apruebas: por qué (se lo enseñamos al negocio)"></div>'+
+      '<div class="acts"><button class="btn ok" type="button">Aprobar y enviar</button><button class="btn-ghost danger no" type="button">No aprobar</button></div>'+
+      '<div class="msg"></div></div>').join('') : '<div class="empty">No hay avisos esperando revisión.</div>';
+  document.querySelectorAll('#pend .card').forEach(c=>{
+    const id=c.dataset.id, msg=c.querySelector('.msg');
+    c.querySelector('.ok').onclick=async function(){
+      this.disabled=true;
+      const x=await api('POST','/admin/broadcasts/'+id+'/approve');
+      if(x.ok) load(); else { msg.textContent=(x.data&&x.data.error)||'No se pudo.'; this.disabled=false; }
+    };
+    c.querySelector('.no').onclick=async function(){
+      const note=c.querySelector('.note').value.trim();
+      if(note.length<5){ msg.textContent='Escribe por qué no se aprueba.'; return; }
+      this.disabled=true;
+      const x=await api('POST','/admin/broadcasts/'+id+'/reject',{ note });
+      if(x.ok) load(); else { msg.textContent=(x.data&&x.data.error)||'No se pudo.'; this.disabled=false; }
+    };
+  });
+
+  document.getElementById('bloq').innerHTML = d.blocked.length ? d.blocked.map(b=>
+    '<div class="card" data-id="'+esc(b.id)+'"><h2>'+esc(b.name)+'</h2>'+
+      '<div class="meta">En pausa desde el '+esc(fecha(b.broadcasts_blocked_at))+': '+esc(b.broadcasts_block_reason||'')+'</div>'+
+      '<div class="acts"><button class="btn-ghost un" type="button">Quitar la pausa</button></div><div class="msg"></div></div>').join('')
+    : '<div class="empty">Ningún negocio tiene los avisos en pausa.</div>';
+  document.querySelectorAll('#bloq .card').forEach(c=>{
+    c.querySelector('.un').onclick=async function(){
+      this.disabled=true;
+      const x=await api('POST','/admin/broadcasts/business/'+c.dataset.id+'/unblock');
+      if(x.ok) load(); else { c.querySelector('.msg').textContent=(x.data&&x.data.error)||'No se pudo.'; this.disabled=false; }
+    };
+  });
+
+  document.getElementById('rec').innerHTML = d.recent.length
+    ? '<table><thead><tr><th>Negocio</th><th>Cuándo</th><th>Estado</th><th>Enviados</th><th>Bajas</th><th>Fallidos</th></tr></thead><tbody>'+
+      d.recent.map(b=>'<tr><td>'+esc(b.business_name)+'</td><td>'+esc(fecha(b.created_at))+'</td><td>'+esc(ST[b.status]||b.status)+(b.stop_reason?'<div class="meta" style="margin:2px 0 0">'+esc(b.stop_reason)+'</div>':'')+'</td>'+
+        '<td class="num">'+b.sent_count+' / '+b.audience_count+'</td><td class="num">'+b.opted_out+'</td><td class="num">'+b.failed_count+'</td></tr>').join('')+'</tbody></table>'
+    : '<div class="empty">Todavía no hay avisos.</div>';
+}
+load();
+</script>
+</body>
+</html>

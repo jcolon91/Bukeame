@@ -738,6 +738,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <div class="alert" id="formAlert"></div>
       <div class="field"><label>Tu nombre *</label><input id="cName" placeholder="Tu nombre completo"></div>
       <div class="field"><label>WhatsApp * (para el recordatorio)</label><input id="cPhone" type="tel" placeholder="787-555-1234"></div>
+      <label id="promoField" style="display:none;align-items:flex-start;gap:9px;font-size:13px;line-height:1.45;color:var(--ink2);margin:-4px 0 14px;cursor:pointer"><input type="checkbox" id="cPromo" style="margin-top:3px;width:16px;height:16px;flex:none;accent-color:var(--teal)"><span id="promoText">Quiero recibir avisos por WhatsApp de este negocio: espacios disponibles, ofertas y noticias. Me doy de baja cuando quiera.</span></label>
       <div class="field"><label>Email (opcional)</label><input id="cEmail" type="email" placeholder="tu@correo.com"><div style="font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45">El negocio te puede escribir por email de vez en cuando. Te das de baja con un toque.</div></div>
       <div class="field" id="memField" style="display:none"><label>Código de membresía (opcional)</label><input id="cMem" placeholder="Si tienes membresía aquí" autocomplete="off" style="font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em"><div id="memMsg" style="font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45">Con tu código y el mismo teléfono de la compra, esta cita se paga con tu membresía.</div></div>
       <div class="field"><label>Nota (opcional)</label><textarea id="cNotes" rows="2" placeholder="Algo que el negocio deba saber"></textarea></div>
@@ -1789,6 +1790,7 @@ document.getElementById('confirmBtn').onclick = async function(){
   if(state.staffId) body.staff_id = state.staffId;
   if(email) body.email = email;
   if(notes) body.client_notes = notes;
+  if(document.getElementById('promoField').style.display !== 'none' && document.getElementById('cPromo').checked) body.promo_opt_in = true;
   var memCode = document.getElementById('memField').style.display==='none' ? '' : document.getElementById('cMem').value.trim().toUpperCase();
   // El código solo viaja si ya se revisó que cubre ESTA cita. Si no la cubre, se dice por
   // qué y el cliente decide (un código viejo guardado no debe trancar la reserva sin avisar).
@@ -2085,6 +2087,11 @@ function renderMore(){
   document.getElementById('checkGift').style.display = hasShop ? '' : 'none';
   document.getElementById('openMem').style.display = hasMem ? '' : 'none';
   document.getElementById('memField').style.display = useMem ? '' : 'none';
+  // Casilla para aceptar avisos por WhatsApp: solo si el negocio los envía.
+  if(state.biz && state.biz.broadcasts_enabled){
+    document.getElementById('promoField').style.display = 'flex';
+    document.getElementById('promoText').textContent = 'Quiero recibir avisos por WhatsApp de '+(state.biz.name||'este negocio')+': espacios disponibles, ofertas y noticias. Me doy de baja cuando quiera.';
+  }
   if(hasShop || hasWait || hasMem) document.getElementById('sec-more').style.display = 'block';
 }
 document.getElementById('openMem').onclick = function(){ location.href = 'membresia.html?slug='+encodeURIComponent(SLUG); };
