@@ -149,19 +149,47 @@ app.post('/api/payments/stripe/webhook',
       // En payment_intent.succeeded usamos su id; en checkout.session el payment_intent (o el id de sesión).
       const extRef = obj.payment_intent || obj.id || null;
 
-      if (code) {
-        // Busca el depósito de ESTA cita por confirmation_code (cualquier negocio:
-        // el code es de alta entropía y único; el webhook es global de la plataforma).
+      // Este webhook recibe los eventos de TODAS las cuentas conectadas (cada dueño tiene
+      // sus llaves y puede crear cobros con la metadata que quiera), así que la metadata
+      // sola no prueba nada: solo cuenta un pago hecho en la cuenta Stripe del negocio
+      // dueño de la cita u orden, por el monto exacto, en dólares y ya cobrado. Una sesión
+      // "unpaid" de un pago diferido no confirma nada: lo hace luego payment_intent.succeeded.
+      const pago = {
+        account: event.account || null,
+        amount: Number(obj.amount_total != null ? obj.amount_total : (obj.amount_received != null ? obj.amount_received : obj.amount)),
+        currency: String(obj.currency || '').toLowerCase(),
+        paid: type === 'payment_intent.succeeded' ? obj.status === 'succeeded' : obj.payment_status === 'paid',
+      };
+      const deOtraCuenta = (acct) => !pago.account || !acct || pago.account !== acct;
+      const noCuadra = (cents) => !Number.isInteger(cents) || pago.amount !== cents || pago.currency !== 'usd';
+      const usd = (c) => '$' + (Number(c || 0) / 100).toFixed(2);
+
+      if (code && pago.paid) {
+        // Busca el depósito de ESTA cita por confirmation_code, con la cuenta Stripe del
+        // negocio dueño (el code lo ve el cliente, así que no basta para confirmar).
         const { rows } = await db.query(
-          `SELECT a.id, a.business_id, a.service_name, a.status,
-                  p.id AS payment_id, p.status AS pay_status
+          `SELECT a.id, a.business_id, a.service_name, a.status, a.deposit_cents,
+                  p.id AS payment_id, p.status AS pay_status, p.amount_cents AS pay_amount,
+                  pp.config->>'stripe_account_id' AS acct
              FROM appointments a
              LEFT JOIN payments p ON p.appointment_id = a.id AND p.kind = 'deposit'
+             LEFT JOIN payment_providers pp ON pp.business_id = a.business_id AND pp.provider = 'stripe'
             WHERE a.confirmation_code = $1
             LIMIT 1`, [code]);
         const a = rows[0];
+        // El mismo monto que cobra el checkout (module-payments): el del payment, si no el de la cita.
+        const esperado = a && (Number.isInteger(a.pay_amount) ? a.pay_amount : a.deposit_cents);
+        if (a && deOtraCuenta(a.acct)) {
+          console.error('stripe depósito: el pago no viene de la cuenta del negocio', a.id, pago.account);
+        } else if (a && noCuadra(esperado)) {
+          console.error('stripe depósito: el pago no cuadra', a.id, pago.amount, pago.currency);
+          try {
+            await notify(a.business_id, 'payment', 'Pago con tarjeta que no cuadra',
+              `Llegó un pago con tarjeta de ${usd(pago.amount)} para el depósito de ${usd(esperado)} de ${a.service_name} y no confirmamos la cita. Revísalo en tu Stripe.`,
+              { appointment_id: a.id });
+          } catch (e) { console.error('stripe webhook notify:', e.message); }
         // IDEMPOTENTE: si no existe, ya está pagado o ya está confirmado → no reprocesar.
-        if (a && a.pay_status !== 'paid' && a.status !== 'confirmed') {
+        } else if (a && a.pay_status !== 'paid' && a.status !== 'confirmed') {
           if (a.payment_id)
             await db.query(
               `UPDATE payments SET status = 'paid', paid_at = now(), external_ref = $2
@@ -185,12 +213,26 @@ app.post('/api/payments/stripe/webhook',
 
       // ── Órdenes de tienda pagadas con tarjeta (metadata kind='order') ──────
       const orderId = (md.order_id || '').toString().trim();
-      if (md.kind === 'order' && isUuid(orderId)) {
-        // Multi-tenant: el business_id sale de la FILA, nunca de metadata.
+      if (md.kind === 'order' && isUuid(orderId) && pago.paid) {
+        // Multi-tenant: el business_id (y su cuenta Stripe) sale de la FILA, nunca de metadata.
         const { rows: orows } = await db.query(
-          `SELECT id, business_id, status, committed FROM product_orders WHERE id = $1 LIMIT 1`, [orderId]);
+          `SELECT o.id, o.business_id, o.status, o.committed, o.total_cents,
+                  pp.config->>'stripe_account_id' AS acct
+             FROM product_orders o
+             LEFT JOIN payment_providers pp ON pp.business_id = o.business_id AND pp.provider = 'stripe'
+            WHERE o.id = $1 LIMIT 1`, [orderId]);
         const o = orows[0];
-        if (o && !o.committed && o.status === 'pending' && revenueMod && revenueMod.confirmOrderPayment) {
+        if (o && deOtraCuenta(o.acct)) {
+          console.error('stripe orden: el pago no viene de la cuenta del negocio', orderId, pago.account);
+        } else if (o && noCuadra(o.total_cents)) {
+          // El checkout cobra el total (las órdenes con gift card no se pagan en línea).
+          console.error('stripe orden: el pago no cuadra', orderId, pago.amount, pago.currency);
+          try {
+            await notify(o.business_id, 'order', 'Pago con tarjeta que no cuadra',
+              `Llegó un pago con tarjeta de ${usd(pago.amount)} para una orden de ${usd(o.total_cents)} y no la confirmamos. Revísalo en tu Stripe.`,
+              { order_id: orderId });
+          } catch (e) { console.error('stripe order notify:', e.message); }
+        } else if (o && !o.committed && o.status === 'pending' && revenueMod && revenueMod.confirmOrderPayment) {
           const r = await revenueMod.confirmOrderPayment(orderId, o.business_id);
           try {
             await notify(o.business_id, 'order',
