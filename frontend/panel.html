@@ -3538,9 +3538,9 @@ function renderPlazos(d){
   if(d.plan_locked) h += '<p style="font-size:12.5px;color:var(--ink2);margin:0 0 10px">Disponible desde el plan Pro, como los demás pagos en línea.</p>';
   if(d.stripe.aviso) h += '<p style="font-size:12.5px;color:#9A5B12;margin:0 0 10px">'+esc(d.stripe.aviso)+'</p>';
   h += plazoCard('klarna','Klarna', d.klarna, d,
-    'Sirve en Puerto Rico. Paga en 4 desde $1 hasta $2,000, o en meses hasta $10,000. Por tu Stripe, Stripe te cobra 5.99% + 30¢ por cada pago con Klarna. No se puede usar para vender gift cards.');
+    'Sirve en Puerto Rico. Por tu Stripe, le sale al cliente en pagos de $50 o más y en citas de aquí a 30 días: en un depósito pequeño te costaría el doble que la tarjeta, y una cita lejana complica las devoluciones. Stripe te cobra 5.99% + 30¢ por cada pago con Klarna. No se puede usar para vender gift cards.');
   h += plazoCard('affirm','Affirm', d.affirm, d,
-    'Ojo: Affirm solo acepta clientes con dirección en EE. UU. y Canadá, no en Puerto Rico, así que a la mayoría de tus clientes no les va a salir. Desde $35 hasta $30,000. Por tu Stripe, Stripe te cobra 6% + 30¢ por cada pago con Affirm.');
+    'Ojo: Affirm solo acepta clientes con dirección en EE. UU. y Canadá, no en Puerto Rico, así que a la mayoría de tus clientes no les va a salir. Por tu Stripe, sale con las mismas reglas que Klarna ($50 o más, citas de aquí a 30 días). Stripe te cobra 6% + 30¢ por cada pago con Affirm.');
   const a = d.acima;
   const min = money(a.min_cents).replace('.00','');
   const elegibles = (a.productos||[]).filter(function(p){ return p.price_cents >= a.min_cents; });
@@ -3790,9 +3790,9 @@ async function cobroPlazosUI(apptId){
     const klarna = d.klarna.modo==='stripe' && d.klarna.en_stripe==='active';
     const affirm = d.affirm.modo==='stripe' && d.affirm.en_stripe==='active';
     let nota = 'El cliente paga con tarjeta en la página segura de tu Stripe, desde su celular. La cita se completa sola cuando pague.';
-    if(klarna && affirm) nota += ' También le sale Klarna si el monto califica, y Affirm desde $35 si su dirección es de EE. UU. (no de Puerto Rico).';
-    else if(klarna) nota += ' También le sale Klarna si el monto califica.';
-    else if(affirm) nota += ' También le sale Affirm desde $35 si su dirección es de EE. UU. (no de Puerto Rico).';
+    if(klarna && affirm) nota += ' Si el cobro es de $50 o más, también le sale Klarna, y Affirm si su dirección es de EE. UU. (no de Puerto Rico).';
+    else if(klarna) nota += ' Si el cobro es de $50 o más, también le sale Klarna.';
+    else if(affirm) nota += ' Si el cobro es de $50 o más y su dirección es de EE. UU. (no de Puerto Rico), también le sale Affirm.';
     document.getElementById('cobroLinkBtn').textContent = 'Mandar enlace de pago';
     document.getElementById('cobroLinkNote').textContent = nota;
     document.getElementById('cobroLinkWrap').style.display = '';

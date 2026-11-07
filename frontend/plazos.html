@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paga a plazos — Bukéame</title>
+<meta name="description" content="Cómo pagar a plazos con Klarna, Affirm o Acima en los negocios de Bukéame: el negocio recibe el pago completo y tú pagas en partes a la compañía que escojas.">
+<meta name="theme-color" content="#0E8074">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='800' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+  --text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+  --green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);
+  --awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+  --display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{color-scheme:dark;
+  --bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+  --text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+  --green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);
+  --awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;line-height:1.6}
+a{color:var(--green);font-weight:700;text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.awning{height:12px;background:var(--awning)}
+.topbar{background:var(--card);color:var(--muted);text-align:center;padding:7px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 14px;border-bottom:1px solid var(--border)}
+.topbar b{color:var(--green);font-weight:700}
+.theme-tg{display:inline-flex;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 12.5px 'Instrument Sans',sans-serif;padding:6px 13px;border-radius:999px;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:620px;margin:0 auto;padding:34px 18px 10px}
+.back{display:inline-block;font-size:13.5px;margin-bottom:22px}
+h1{font-family:var(--display);font-weight:800;font-size:32px;letter-spacing:-.02em;line-height:1.1;margin-bottom:12px}
+.lead{font-size:16px;color:var(--text);margin-bottom:30px}
+.seclabel{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:34px 0 14px}
+.seclabel::after{content:"";flex:1;height:1px;background:var(--border)}
+.paso{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:14px 0;border-top:1px solid var(--border)}
+.paso:last-child{border-bottom:1px solid var(--border)}
+.paso .n{font-family:var(--mono);font-weight:700;font-size:13px;color:var(--green);padding-top:2px}
+.paso b{display:block;font-size:15.5px;margin-bottom:2px}
+.paso p{font-size:14.5px;color:var(--muted)}
+.prov{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:14px}
+.prov h2{font-family:var(--display);font-weight:800;font-size:21px;letter-spacing:-.01em;margin-bottom:6px}
+.prov p{font-size:14.5px;color:var(--text)}
+.prov p + p{margin-top:8px}
+.prov .ojo{color:var(--muted);font-size:13.5px}
+.btn{display:block;text-align:center;font-weight:700;font-size:15px;padding:13px;border-radius:14px;margin-top:14px;background:var(--green);color:var(--green-ink)}
+details{border-top:1px solid var(--border);padding:14px 0}
+details:last-of-type{border-bottom:1px solid var(--border)}
+summary{cursor:pointer;font-weight:700;font-size:15px;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--mono);color:var(--green)}
+details[open] summary::after{content:"–"}
+details p{font-size:14.5px;color:var(--muted);margin-top:8px}
+.letra{font-size:12px;color:var(--muted);margin-top:30px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:28px 0 40px}
+</style>
+<script src="bukeame-core.js"></script>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div class="topbar">Reservas por <b>Buk<span style="color:var(--green)">é</span>ame</b><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></div>
+<div class="awning"></div>
+
+<main class="wrap">
+  <a class="back" id="volver" href="buscar.html">← Volver</a>
+  <h1>Paga a plazos</h1>
+  <p class="lead" id="lead">El negocio recibe el pago completo de una vez y tú lo vas pagando en partes a la compañía que escojas. Bukéame no presta dinero ni decide quién califica.</p>
+
+  <div class="seclabel">Cómo funciona</div>
+  <div class="paso"><span class="n">01</span><div><b>Reserva o escoge lo que vas a pagar</b><p id="paso1">Una cita, una membresía o una compra en la tienda del negocio.</p></div></div>
+  <div class="paso"><span class="n">02</span><div><b>Al pagar con tarjeta, escoge Klarna</b><p id="paso2">Aparece en la página segura de Stripe cuando el pago es de $50 o más y la cita es de aquí a 30 días. Te dicen en segundos si te aprueban.</p></div></div>
+  <div class="paso"><span class="n">03</span><div><b>Paga tus cuotas en la app de la compañía</b><p>El plan, las fechas y los pagos los llevas con Klarna. El negocio no te cobra las cuotas.</p></div></div>
+
+  <div class="seclabel">Las compañías</div>
+  <div id="provs"></div>
+
+  <div class="seclabel">Preguntas</div>
+  <details><summary>¿Cuesta más que pagar con tarjeta?</summary><p>Depende del plan. Antes de que aceptes, Klarna o Affirm te enseñan cuánto pagas en cada cuota y si el plan tiene interés o cargos. Si pagas tarde, Klarna te puede cobrar un cargo por atraso.</p></details>
+  <details><summary>¿Afecta mi crédito?</summary><p>Depende de la compañía y del plan. Los planes cortos, como pagar en 4 partes, a menudo no; los de varios meses pueden. La compañía te lo dice antes de que aceptes.</p></details>
+  <details><summary>¿Qué pasa si cancelo o el negocio me devuelve el dinero?</summary><p>La devolución la hace el negocio según sus normas. Cuando la hace, la compañía cancela las cuotas que faltan y te devuelve lo que ya pagaste (con Affirm, menos el interés que hayas pagado).</p></details>
+  <details><summary>¿Puedo ver si califico antes de reservar?</summary><p>Sí. Puedes abrir tu cuenta en la app de Klarna antes de la cita y ver hasta cuánto te aprueban. Así el pago va más rápido.</p></details>
+  <details><summary>¿Por qué no me sale Klarna en un depósito pequeño?</summary><p>En Bukéame el pago a plazos sale en pagos de $50 o más y en citas de aquí a 30 días. En un depósito pequeño no vale la pena dividirlo, y una cita lejana complica las devoluciones.</p></details>
+
+  <p class="letra">El financiamiento mensual de Klarna lo emite WebBank. Klarna, Affirm y Acima tienen sus propios términos y políticas de privacidad; la solicitud la haces directamente con ellos.</p>
+</main>
+<div class="foot">Bukéame · Puerto Rico</div>
+
+<script>
+// Lo que ofrece ESTE negocio (si viene ?slug=), sacado de su perfil público.
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function prov(titulo, cuerpo, enlace){
+  return '<div class="prov"><h2>'+esc(titulo)+'</h2>'+cuerpo+(enlace ? '<a class="btn" href="'+esc(enlace.href)+'" target="_blank" rel="noopener">'+esc(enlace.txt)+'</a>' : '')+'</div>';
+}
+var KLARNA_STRIPE = '<p>Sirve en Puerto Rico. Según el monto, Klarna te ofrece pagar en 4 partes, en 30 días o a plazos mensuales. La escoges en la página segura de Stripe al pagar con tarjeta, en pagos de $50 o más.</p>';
+var KLARNA_DIRECTO = '<p>Sirve en Puerto Rico. Este negocio usa su propia cuenta de Klarna: pídele el enlace y pagas a plazos desde tu celular.</p>';
+var AFFIRM = '<p>Affirm solo acepta clientes con dirección en EE. UU. (no en Puerto Rico). Si tu dirección es de aquí, usa Klarna.</p>';
+function acima(link){
+  return prov('Acima',
+    '<p>Acima no es un préstamo: es un arrendamiento con opción a compra. Te llevas el artículo y lo vas pagando; si haces todos los pagos te sale más caro que el precio de contado.</p>'+
+    '<p class="ojo">Solo para artículos de la tienda de $300 o más. No sirve para servicios ni gift cards. Cuando te aprueben, avísale al negocio para que te lo entregue.</p>',
+    link ? { href: link, txt: 'Solicitar con Acima' } : null);
+}
+function generico(){
+  document.getElementById('provs').innerHTML =
+    prov('Klarna', KLARNA_STRIPE, { href: 'https://www.klarna.com/us/', txt: 'Ver si califico con Klarna' }) +
+    prov('Affirm', AFFIRM, null) +
+    acima(null);
+}
+(async function(){
+  var slug = new URLSearchParams(location.search).get('slug');
+  if(!slug){ generico(); return; }
+  try {
+    var r = await fetch('/api/public/'+encodeURIComponent(slug));
+    if(!r.ok) throw new Error(r.status);
+    var d = await r.json();
+    var biz = d.business || {};
+    var pz = (d.payment_config || {}).plazos;
+    var volver = document.getElementById('volver');
+    volver.href = 'negocio.html?slug='+encodeURIComponent(slug);
+    volver.textContent = '← Volver a '+(biz.name || 'el negocio');
+    if(!pz){ document.getElementById('lead').textContent = (biz.name || 'Este negocio')+' no ofrece pago a plazos por ahora. Así funciona en los negocios que sí lo ofrecen.'; generico(); return; }
+    document.getElementById('lead').textContent = (biz.name || 'El negocio')+' recibe el pago completo de una vez y tú lo vas pagando en partes a la compañía que escojas. Bukéame no presta dinero ni decide quién califica.';
+    var min = '$'+Math.round((pz.min_cents || 5000)/100);
+    if(pz.klarna !== 'stripe') document.getElementById('paso2').textContent = 'Pídele al negocio el enlace de la compañía que ofrece y págalo desde tu celular. Te dicen en segundos si te aprueban.';
+    else document.getElementById('paso2').textContent = 'Aparece en la página segura de Stripe cuando el pago es de '+min+' o más y la cita es de aquí a '+(pz.dias || 30)+' días. Te dicen en segundos si te aprueban.';
+    var h = '';
+    if(pz.klarna) h += prov('Klarna', pz.klarna === 'stripe' ? KLARNA_STRIPE.replace('$50', min) : KLARNA_DIRECTO, { href: 'https://www.klarna.com/us/', txt: 'Ver si califico con Klarna' });
+    if(pz.affirm) h += prov('Affirm', AFFIRM + (pz.affirm === 'directo' ? '<p class="ojo">Este negocio usa su propia cuenta de Affirm: pídele el enlace.</p>' : ''), null);
+    if(pz.acima) h += acima(pz.acima.link);
+    document.getElementById('provs').innerHTML = h || '';
+    if(!h) generico();
+  } catch(e){ generico(); }
+})();
+</script>
+<script src="i18n.js" defer></script>
+</body>
+</html>

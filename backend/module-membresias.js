@@ -81,8 +81,13 @@ module.exports.mount = function (app, ctx) {
     if (by.ath_movil_business && by.ath_movil_business.config.ath_public_token)
       out.push({ v: 'ath_business', t: 'ATH Móvil', d: 'Te llega la solicitud de pago a tu app de ATH Móvil.' });
     // Sin el webhook de Connect, el pago con tarjeta nunca activaría la membresía.
-    if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET && by.stripe && by.stripe.config.stripe_account_id)
-      out.push({ v: 'card', t: 'Tarjeta', d: 'Pagas en la página segura de Stripe.' });
+    if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET && by.stripe && by.stripe.config.stripe_account_id) {
+      // Pago a plazos: Klarna sale en esa página si el negocio lo ofrece y la membresía es de $50 o más.
+      const pz = h.plazos ? await h.plazos.publico(biz.id).catch(() => null) : null;
+      const klarna = pz && pz.klarna === 'stripe'
+        ? ` Si la membresía es de $${Math.round(pz.min_cents / 100)} o más, también la puedes pagar a plazos con Klarna.` : '';
+      out.push({ v: 'card', t: 'Tarjeta', d: 'Pagas en la página segura de Stripe.' + klarna });
+    }
     const athPhone = telTxt((by.ath_movil && by.ath_movil.account_ref) || biz.ath_phone || null);
     if (athPhone)
       out.push({ v: 'ath_manual', t: `ATH Móvil al ${athPhone}`, d: 'Envías el pago y el negocio activa tu membresía.', phone: athPhone });
@@ -807,16 +812,26 @@ module.exports.mount = function (app, ctx) {
     // en otra pestaña no puede cobrar otra vez al día siguiente.
     body.set('expires_at', String(Math.floor(Date.now() / 1000) + 31 * 60));
     if (!m.email) body.delete('customer_email');
+    // Pago a plazos: Klarna y Affirm solo si el negocio los ofrece y la membresía es de $50 o más.
+    const excl = h.plazos ? await h.plazos.excluidos(m.business_id, { amountCents: m.price_cents }).catch(() => []) : [];
+    if (excl.length) h.plazos.ponerExcluidos(body, excl);
     let session;
     try {
-      const r = await fetch((process.env.STRIPE_API_BASE || 'https://api.stripe.com') + '/v1/checkout/sessions', {
+      const post = () => fetch((process.env.STRIPE_API_BASE || 'https://api.stripe.com') + '/v1/checkout/sessions', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + process.env.STRIPE_SECRET_KEY,
                    'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Account': acct },
         body: body.toString(),
         signal: AbortSignal.timeout(20_000),
       });
+      let r = await post();
       session = await r.json();
+      // Si Stripe no acepta ocultarlos, la página sale igual sin ocultar nada.
+      if (!r.ok && r.status === 400 && excl.length) {
+        h.plazos.quitarExcluidos(body);
+        r = await post();
+        session = await r.json();
+      }
       if (!r.ok || !session || !session.url) {
         console.error('membresía checkout:', session && session.error ? session.error.message : r.status);
         return bad(res, 'No pudimos abrir el pago con tarjeta. Intenta de nuevo.', 502);

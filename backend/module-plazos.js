@@ -40,6 +40,11 @@ module.exports.mount = function (app, ctx) {
   const COBROS_POR_HORA = 60;
   const CAPS_VIGENCIA_MS = 10 * 60_000;       // el panel vuelve a preguntar a los 10 min
   const CAPS_VIEJAS_MS = 48 * 3600_000;       // la página no anuncia lo que no se ha visto en 2 días
+  // Klarna y Affirm (por Stripe) solo en cobros de $50 o más y en citas de aquí a 30 días,
+  // como GOLDIE: a plazos un depósito de $5 no tiene sentido y le cuesta al negocio el doble
+  // que la tarjeta, y una cita lejana complica las devoluciones.
+  const PLAZOS_MIN = 5000;
+  const PLAZOS_DIAS = 30;
 
   // ¿Ya corrió la migración 41? Se vuelve a revisar (cada 30 s como mucho) mientras no esté:
   // si Node arranca antes que Postgres, o la migración se corre con el servidor prendido,
@@ -145,6 +150,23 @@ module.exports.mount = function (app, ctx) {
 
   // Lo que se puede anotar al cobrar una CITA. Acima no: no arrienda servicios.
   function metodosCita() { return enumExtra.filter(v => v === 'klarna' || v === 'affirm'); }
+
+  // Qué hay que ocultar en un Checkout de Stripe del negocio: Klarna y Affirm si el negocio no
+  // los ofrece por Stripe en Bukéame, si el cobro es de menos de $50 o si la cita es de aquí a
+  // más de 30 días. Solo se oculta lo que Stripe dijo que la cuenta tiene activo: lo que no está
+  // activo no sale de todos modos.
+  async function excluidos(businessId, { amountCents, startsAt } = {}) {
+    if (!(await asegurar())) return [];
+    const { rows } = await db.query(`SELECT klarna, affirm, stripe_caps FROM plazos_config WHERE business_id = $1`, [businessId]);
+    const r = rows[0];
+    if (!r) return [];
+    const caps = r.stripe_caps || {};
+    const chico = !Number.isInteger(amountCents) || amountCents < PLAZOS_MIN;
+    const lejos = !!startsAt && (new Date(startsAt).getTime() - Date.now() > PLAZOS_DIAS * 864e5);
+    return ['klarna', 'affirm'].filter(m => caps[m] === 'active' && (r[m] !== 'stripe' || chico || lejos));
+  }
+  const ponerExcluidos = (body, lista) => lista.forEach((m, i) => body.set(`excluded_payment_method_types[${i}]`, m));
+  const quitarExcluidos = (body) => [...body.keys()].filter(k => k.startsWith('excluded_payment_method_types')).forEach(k => body.delete(k));
 
   // ── GET /api/plazos — lo que ofrece el negocio y lo que dice su Stripe ──────────
   app.get('/api/plazos', authRequired, businessScope, asyncH(async (req, res) => {
@@ -272,7 +294,7 @@ module.exports.mount = function (app, ctx) {
     if (!st.puedeCobrar) return bad(res, 'Para cobrar por enlace conecta tu Stripe con el botón "Conectar con Stripe" en Pagos.', 409);
 
     const { rows } = await db.query(
-      `SELECT a.id, a.status, a.service_name, c.email
+      `SELECT a.id, a.status, a.service_name, a.starts_at, c.email
          FROM appointments a LEFT JOIN clients c ON c.id = a.client_id
         WHERE a.id = $1 AND a.business_id = $2`, [appointment_id, req.business.id]);
     const a = rows[0];
@@ -342,10 +364,20 @@ module.exports.mount = function (app, ctx) {
     body.set('payment_intent_data[metadata][cobro_id]', e.id);
     body.set('payment_intent_data[description]', servicio);
     if (a.email && isEmail(String(a.email))) body.set('customer_email', String(a.email));
+    const excl = await excluidos(req.business.id, { amountCents: total, startsAt: a.starts_at });
+    ponerExcluidos(body, excl);
 
     let ses;
     try { ses = await stripe('POST', '/v1/checkout/sessions', { body, acct: st.acct, idem: 'cobro-' + e.id }); }
-    catch (err) { console.error('plazos: no se pudo crear el enlace de cobro:', err.message); ses = null; }
+    catch (err) {
+      ses = null;
+      // Si Stripe no acepta ocultarlos, el enlace sale igual (con Klarna o Affirm visibles).
+      if (excl.length && err.status === 400) {
+        quitarExcluidos(body);
+        try { ses = await stripe('POST', '/v1/checkout/sessions', { body, acct: st.acct, idem: 'cobro-' + e.id + '-2' }); }
+        catch (err2) { console.error('plazos: no se pudo crear el enlace de cobro:', err2.message); }
+      } else console.error('plazos: no se pudo crear el enlace de cobro:', err.message);
+    }
     if (!ses || !ses.id || !ses.url) {
       await db.query(`UPDATE cobro_enlaces SET status = 'cancelled' WHERE id = $1 AND status = 'open'`, [e.id]);
       return bad(res, 'Stripe no pudo crear el enlace ahora mismo. Intenta de nuevo o cobra de otra forma.', 502);
@@ -526,6 +558,7 @@ module.exports.mount = function (app, ctx) {
     const out = {
       klarna: via(r.klarna, 'klarna'),
       affirm: via(r.affirm, 'affirm'),
+      min_cents: PLAZOS_MIN, dias: PLAZOS_DIAS,   // reglas de Klarna y Affirm (la página las usa)
       acima: r.acima_link ? { link: r.acima_link, min_cents: ACIMA_MIN } : null,
     };
     return (out.klarna || out.affirm || out.acima) ? out : null;
@@ -552,5 +585,5 @@ module.exports.mount = function (app, ctx) {
   }
 
   console.log('  ✓ módulo pago a plazos montado (Klarna/Affirm por Stripe o directo, Acima por enlace)');
-  return { publico, cobroPagado, cerrarAbiertos, limpiar, metodosCita, listo: () => listo };
+  return { publico, cobroPagado, cerrarAbiertos, limpiar, metodosCita, excluidos, ponerExcluidos, quitarExcluidos, listo: () => listo };
 };

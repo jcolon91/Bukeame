@@ -343,6 +343,32 @@ module.exports.mount = function (app, ctx) {
   //  comisión sobre la cita. Sin SDK: fetch a api.stripe.com (form-urlencoded).
   // ══════════════════════════════════════════════════════════════════════════
 
+  // Crea la Checkout Session en la cuenta del negocio. Con el pago a plazos (h.plazos) oculta
+  // Klarna y Affirm donde no van (cobro de menos de $50, cita de aquí a más de 30 días, o el
+  // negocio no los ofrece); si Stripe no acepta ocultarlos, la sesión sale igual sin ocultar.
+  const STRIPE_API = () => (process.env.STRIPE_API_BASE || 'https://api.stripe.com').replace(/\/+$/, '');
+  async function crearSesion(body, acct, businessId, regla) {
+    const excl = h.plazos ? await h.plazos.excluidos(businessId, regla).catch(() => []) : [];
+    if (excl.length) h.plazos.ponerExcluidos(body, excl);
+    const post = () => fetch(STRIPE_API() + '/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + process.env.STRIPE_SECRET_KEY,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Stripe-Account': acct,   // ← cargo DIRECTO en la cuenta del negocio
+      },
+      body: body.toString(),
+    });
+    let r = await post();
+    let session = await r.json();
+    if (!r.ok && r.status === 400 && excl.length) {
+      h.plazos.quitarExcluidos(body);
+      r = await post();
+      session = await r.json();
+    }
+    return { r, session };
+  }
+
   // ── POST /api/public/:slug/appointments/:code/stripe/checkout ──────────────
   // Público (codeLimiter). Crea una Checkout Session con cargo DIRECTO sobre la
   // cuenta conectada del negocio y devuelve { url } para redirigir al cliente.
@@ -353,7 +379,7 @@ module.exports.mount = function (app, ctx) {
     // La cita debe pertenecer al negocio del slug (aislamiento multi-tenant).
     // Traemos el depósito (kind='deposit') y el stripe_account_id del negocio.
     const { rows } = await db.query(
-      `SELECT a.id, a.business_id, a.service_name, a.status, a.deposit_cents,
+      `SELECT a.id, a.business_id, a.service_name, a.status, a.deposit_cents, a.starts_at,
               p.id AS payment_id, p.status AS pay_status, p.amount_cents AS pay_amount,
               pp.config AS stripe_config
          FROM appointments a
@@ -398,16 +424,9 @@ module.exports.mount = function (app, ctx) {
 
     let session;
     try {
-      const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + process.env.STRIPE_SECRET_KEY,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Stripe-Account': acct,   // ← cargo DIRECTO en la cuenta del negocio
-        },
-        body: body.toString(),
-      });
-      session = await r.json();
+      const out = await crearSesion(body, acct, a.business_id, { amountCents: amount, startsAt: a.starts_at });
+      const r = out.r;
+      session = out.session;
       if (!r.ok || !session || !session.url) {
         console.error('stripe checkout:', session && session.error ? session.error.message : r.status);
         return bad(res, 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.', 502);
@@ -473,16 +492,9 @@ module.exports.mount = function (app, ctx) {
 
     let session;
     try {
-      const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + process.env.STRIPE_SECRET_KEY,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Stripe-Account': acct,
-        },
-        body: body.toString(),
-      });
-      session = await r.json();
+      const out = await crearSesion(body, acct, o.business_id, { amountCents: amount });
+      const r = out.r;
+      session = out.session;
       if (!r.ok || !session || !session.url) {
         console.error('stripe order checkout:', session && session.error ? session.error.message : r.status);
         return bad(res, 'No se pudo iniciar el pago con tarjeta. Intenta de nuevo.', 502);

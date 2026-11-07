@@ -65,9 +65,28 @@ Reglas que evitan cobrar dos veces o perder un pago:
 - Una cita cancelada, sin llegar o ya cobrada no hace enlace. Un pago que llega igual se anota (el
   dinero entró) y se le avisa al negocio, como cuando el cliente paga dos veces.
 
-En la página pública, el botón de tarjeta dice Klarna solo si el monto entra en sus planes ($1 a
-$10,000) y nunca dice Affirm (no le sale a clientes de PR); Affirm se explica en la fila "A plazos".
-Lo que dice Stripe de cada cuenta se refresca a diario, y si no se ha visto en 2 días no se anuncia.
+## Reglas copiadas de GOLDIE (6-nov-2026)
+
+GOLDIE (que también cobra a plazos por Stripe, con Affirm, Klarna, Afterpay y Zip, sin Acima) solo
+lo ofrece en cobros de más de $50 y en citas de aquí a 30 días. Bukéame hace lo mismo:
+
+- **$50 o más y citas de aquí a 30 días.** Cada Checkout de Stripe del negocio (depósito, tienda,
+  membresía y cobro por enlace) oculta Klarna y Affirm con `excluded_payment_method_types` cuando
+  el cobro es menor, la cita es lejana o el negocio no los ofrece por Stripe en Bukéame. Solo se
+  oculta lo que Stripe dijo que la cuenta tiene activo; si Stripe no acepta ocultarlo, la sesión se
+  crea igual sin ocultar nada (no se cae el pago). Constantes `PLAZOS_MIN` y `PLAZOS_DIAS` en
+  `module-plazos.js`.
+- **Aviso en la página del negocio**: una tarjeta que se puede cerrar ("Puedes pagar a plazos con
+  Klarna en pagos de $50 o más…") con enlace a **`plazos.html?slug=`**, la página que le explica al
+  cliente cómo funciona, cada compañía (Affirm sin PR; Acima es arrendamiento) y las preguntas
+  comunes. La fila "A plazos" de las normas también enlaza ahí.
+- **No se copió**: pago a plazos de gift cards (Klarna lo prohíbe), comisión de plataforma ni
+  cuentas Stripe manejadas por Bukéame, ni terminal física (el enlace con QR cubre lo de en persona).
+
+En la página pública, el botón de tarjeta dice Klarna solo en pagos de $50 a $10,000 de citas de
+aquí a 30 días, y nunca dice Affirm (no le sale a clientes de PR); Affirm se explica en la fila "A
+plazos". Lo que dice Stripe de cada cuenta se refresca a diario, y si no se ha visto en 2 días no
+se anuncia.
 
 ## Desplegar
 

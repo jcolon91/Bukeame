@@ -352,6 +352,11 @@ html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;
 .pd-buynow:disabled{border-color:var(--border);color:var(--muted2);background:var(--card-soft)}
 .pd-pay{font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px;font-family:var(--mono);letter-spacing:.01em}
 .pd-acima p{font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0 0}
+.plz-aviso{margin:18px 0 0;padding:14px 16px;border:1px solid var(--border);border-radius:18px;background:var(--card);display:flex;gap:12px;align-items:flex-start}
+.plz-aviso p{margin:0;font-size:13.5px;line-height:1.55;color:var(--text);flex:1}
+.plz-aviso a{color:var(--green);font-weight:700;text-decoration:none;white-space:nowrap}
+.plz-aviso button{background:none;border:0;padding:2px;cursor:pointer;color:var(--muted);flex:none}
+.plz-aviso button svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
 /* Layout 2 columnas en pantallas anchas */
 @media(min-width:720px){
   .pd-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start}
@@ -578,6 +583,9 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 
   <div class="bk-layout">
   <div class="wrap">
+    <!-- PAGO A PLAZOS: aviso (como GOLDIE), solo si el negocio ofrece Klarna o Affirm -->
+    <div id="plazosAviso" class="plz-aviso" style="display:none"></div>
+
     <!-- SOBRE -->
     <section class="sec" id="sec-about" style="display:none">
       <div class="sec-title">Sobre nosotros</div>
@@ -948,6 +956,7 @@ async function boot(){
     state.gallery = data.gallery||[];
     try{ setSeo(); }catch(e){ if(window.bkCaptureError) window.bkCaptureError(e, {where:'negocio.setSeo', slug:SLUG}); }
     renderProfile();
+    try{ renderPlazosAviso(); }catch(e){}
     renderServices();
     renderGallery();
     renderShop();
@@ -1200,7 +1209,8 @@ function renderProfile(){
       .filter(function(v,i,a){ return a.indexOf(v)===i; }).join(' · ');
     pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">Pagos</span><span class="val">'+esc(pm)+'</span></div>');
   }
-  if(plazosResumen()) pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">A plazos</span><span class="val">'+esc(plazosResumen())+'</span></div>');
+  if(plazosResumen()) pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">A plazos</span><span class="val">'+esc(plazosResumen())+
+    ' <a href="plazos.html?slug='+encodeURIComponent(SLUG)+'" style="color:var(--green);font-weight:700;text-decoration:none">Cómo funciona</a></span></div>');
   if(pol.length){
     document.getElementById('sec-policies').style.display='block';
     document.getElementById('policyList').innerHTML = pol.join('');
@@ -1952,14 +1962,14 @@ function renderPayStep(appt, depCents){
     hasAny = true;
     var sb = document.createElement('button');
     sb.className='paybtn'; sb.type='button';
-    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>'+esc(cardLabel(depCents))+'</small></span>';
+    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>'+esc(cardLabel(depCents, state.startIso))+'</small></span>';
     sb.onclick = function(){ startStripeCheckout(code, sb); };
     host.appendChild(sb);
   } else if(stripe && stripe.payment_link){
     hasAny = true;
     var sbl = document.createElement('button');
     sbl.className='paybtn'; sbl.type='button';
-    sbl.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>'+esc(cardLabel(depCents))+'</small></span>';
+    sbl.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>'+esc(cardLabel(depCents, state.startIso))+'</small></span>';
     sbl.onclick = function(){ window.open(stripe.payment_link, '_blank', 'noopener'); };
     host.appendChild(sbl);
   }
@@ -2171,22 +2181,45 @@ async function openProductDetail(id){
 // ── Pago a plazos (payment_config.plazos): Klarna/Affirm por el Stripe del negocio salen
 //    en su página de pago con tarjeta; con su cuenta directa, el negocio manda el enlace.
 //    Acima: solo en los artículos que el negocio marcó, de $300 o más. ──
-// En el botón de tarjeta solo va Klarna, y solo si el monto entra en alguno de sus planes
-// ($1 a $10,000). Affirm no va en el botón: no le sale a clientes de Puerto Rico y empieza
-// en $35; se explica en la fila "A plazos".
-function cardLabel(amountCents){
+// En el botón de tarjeta solo va Klarna, y solo en pagos de $50 o más (hasta $10,000, su tope)
+// de citas de aquí a 30 días: el servidor lo oculta en Stripe con las mismas reglas. Affirm no
+// va en el botón: no le sale a clientes de Puerto Rico; se explica en la fila "A plazos".
+function cardLabel(amountCents, startIso){
   var pz = (state.payment_config||{}).plazos || {};
   var x = ['Tarjeta','Apple Pay','Google Pay'];
   var c = Number(amountCents);
-  if(pz.klarna==='stripe' && c>=100 && c<=1000000) x.push('Klarna');
+  var min = pz.min_cents || 5000, dias = pz.dias || 30;
+  var lejos = startIso && (new Date(startIso).getTime() - Date.now() > dias*864e5);
+  if(pz.klarna==='stripe' && c>=min && c<=1000000 && !lejos) x.push('Klarna');
   return x.join(' · ');
+}
+// Aviso arriba del perfil (como el de GOLDIE), en una tarjeta que se puede cerrar.
+function renderPlazosAviso(){
+  var el = document.getElementById('plazosAviso');
+  var pz = (state.payment_config||{}).plazos || {};
+  if(!el || (!pz.klarna && !pz.affirm)) return;
+  var clave = 'bukeame_plazos_aviso_' + SLUG;
+  try { if(localStorage.getItem(clave)) return; } catch(e){}
+  var min = money(pz.min_cents || 5000).replace('.00','');
+  var txt;
+  if(pz.klarna==='stripe') txt = 'Puedes pagar a plazos con Klarna en pagos de '+min+' o más. Mira si calificas antes de pagar.';
+  else if(pz.klarna==='directo') txt = 'Este negocio acepta Klarna: si quieres pagar a plazos, pídele el enlace.';
+  else txt = 'Puedes pagar a plazos con Affirm si tu dirección es de EE. UU.';
+  if(pz.klarna && pz.affirm) txt += ' También acepta Affirm, solo con dirección de EE. UU.';
+  el.innerHTML = '<p>'+esc(txt)+' <a href="plazos.html?slug='+encodeURIComponent(SLUG)+'">Cómo funciona</a></p>'+
+    '<button type="button" aria-label="Cerrar aviso"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+  el.style.display = 'flex';
+  el.querySelector('button').onclick = function(){
+    el.style.display = 'none';
+    try { localStorage.setItem(clave, '1'); } catch(e){}
+  };
 }
 function plazosResumen(){
   var pz = (state.payment_config||{}).plazos || {};
   var x = [];
   if(pz.klarna==='stripe') x.push('Klarna al pagar con tarjeta');
   else if(pz.klarna==='directo') x.push('Klarna (el negocio te manda el enlace)');
-  if(pz.affirm==='stripe') x.push('Affirm al pagar con tarjeta, desde $35 (solo direcciones de EE. UU.)');
+  if(pz.affirm==='stripe') x.push('Affirm al pagar con tarjeta (solo direcciones de EE. UU.)');
   else if(pz.affirm==='directo') x.push('Affirm (el negocio te manda el enlace; solo direcciones de EE. UU.)');
   if(pz.acima && pz.acima.link) x.push('Acima en artículos de '+money(pz.acima.min_cents).replace('.00','')+' o más');
   return x.join(' · ');
