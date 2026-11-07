@@ -233,7 +233,7 @@ function renderBuy(){
       '</div>'+
       '<div class="field"><label>Mensaje <span class="opt">(opcional)</span></label><textarea id="msg" maxlength="300" placeholder="¡Feliz cumpleaños! Disfruta tu regalo."></textarea></div>'+
       '<button class="cta" id="buyBtn">Comprar gift card</button>'+
-      '<div class="note">El pago se procesa por los métodos del negocio (ATH Móvil, tarjeta, PayPal o Klarna). La gift card vence en 2 años.</div>'+
+      '<div class="note">El pago se procesa por los métodos del negocio (ATH Móvil, tarjeta o PayPal). La gift card vence en 2 años.</div>'+
     '</div>';
 
   el.querySelectorAll('.chips .chip').forEach(function(b){
@@ -299,7 +299,7 @@ function renderBuySuccess(data,fallbackCents){
   const gc=(data&&data.gift_card)||data||{};
   const code=gc.code||gc.gift_card_code||'';
   const amount=gc.initial_cents!=null?gc.initial_cents:(gc.amount_cents!=null?gc.amount_cents:fallbackCents);
-  const note=(data&&data.note)||'El pago se procesa por los métodos del negocio (ATH Móvil, tarjeta, PayPal o Klarna). La tarjeta se activa al confirmarse.';
+  const note=(data&&data.note)||'El pago se procesa por los métodos del negocio (ATH Móvil, tarjeta o PayPal). La tarjeta se activa al confirmarse.';
   const el=document.getElementById('buy');
   el.innerHTML=
     '<div class="card result">'+

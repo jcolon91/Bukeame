@@ -114,6 +114,10 @@ main{padding:22px 20px 90px;max-width:760px;min-width:0}
 .exp-row{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--card);border:1.5px solid var(--border);border-radius:11px;margin-bottom:7px}
 .paymethod{padding:10px 16px;border:1.5px solid var(--border);border-radius:10px;background:var(--card);font-weight:600;font-size:14px;cursor:pointer;color:var(--muted)}
 .paymethod.on{background:var(--green);color:var(--green-ink);border-color:var(--green)}
+.plz-st{font-size:12.5px;line-height:1.55;margin:8px 0 0;color:var(--ink)}
+.plz-st.ok{color:var(--teal-ink)}
+.plz-st.warn{color:#9A5B12}
+.plz-st a{color:inherit;font-weight:600}
 .seclabel{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px;margin:6px 0 14px}
 .seclabel::after{content:"";flex:1;height:1px;background:var(--border)}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:14px}
@@ -857,6 +861,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
         <div class="alert" id="payAlert"></div>
         <div id="paymentsList"></div>
         <div id="pendingGifts"></div>
+        <div id="plazosBox"></div>
         <p style="font-size:12.5px;color:var(--ink2);margin-top:14px;line-height:1.6">Cada método va <b>directo a tu cuenta</b>: ATH Móvil (tu teléfono, o tu Public Token para cobro automático), PayPal (tu usuario de PayPal.me), Stripe (tu Payment Link — créalo en tu panel de Stripe con "el cliente elige el monto"), y el efectivo lo marcas al cobrar en persona.</p>
       </section>
 
@@ -1115,12 +1120,15 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <h3>Cobrar cita</h3>
     <div class="alert" id="cobroAlert"></div>
     <p style="font-size:14px;color:var(--ink2);margin-bottom:14px" id="cobroServicio"></p>
+    <div id="cobroForm">
     <div class="field">
       <label>Método de pago *</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" class="paymethod on" data-m="cash">Efectivo</button>
         <button type="button" class="paymethod" data-m="ath_movil">ATH Móvil</button>
         <button type="button" class="paymethod" data-m="card">Tarjeta</button>
+        <button type="button" class="paymethod" data-m="klarna" style="display:none">Klarna</button>
+        <button type="button" class="paymethod" data-m="affirm" style="display:none">Affirm</button>
       </div>
     </div>
     <div class="field"><label>Cobrado ($) *</label><input id="cobroAmt" type="number" step="0.01" min="0" placeholder="0.00">
@@ -1133,6 +1141,24 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
     <div style="display:flex;gap:10px">
       <button class="btn btn-ghost btn-sm" id="cobroCancel" style="flex:1">Cancelar</button>
       <button class="btn btn-teal btn-sm" id="cobroSave" style="flex:1">Completar y cobrar</button>
+    </div>
+    <div id="cobroLinkWrap" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+      <button type="button" class="btn btn-ghost btn-sm" id="cobroLinkBtn" style="width:100%">Mandar enlace de pago</button>
+      <p id="cobroLinkNote" style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5"></p>
+    </div>
+    </div>
+    <div id="cobroLinkBox" style="display:none;text-align:center">
+      <canvas id="cobroQR" width="440" height="440" style="width:200px;height:200px;border-radius:12px;background:#fff"></canvas>
+      <p id="cobroLinkMsg" style="font-size:13px;color:var(--ink2);margin:10px 0 12px;line-height:1.55"></p>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button type="button" class="btn btn-ghost btn-sm" id="cobroLinkCopy" style="flex:1">Copiar enlace</button>
+        <a class="btn btn-ghost btn-sm" id="cobroLinkWa" target="_blank" rel="noopener" style="flex:1;text-align:center">Enviar por WhatsApp</a>
+      </div>
+      <div id="cobroLinkStatus" style="font-weight:600;font-size:14px;margin-bottom:12px">Esperando el pago…</div>
+      <div style="display:flex;gap:10px">
+        <button type="button" class="btn btn-ghost btn-sm" id="cobroLinkCancel" style="flex:1">Cancelar el enlace</button>
+        <button type="button" class="btn btn-teal btn-sm" id="cobroLinkClose" style="flex:1">Cerrar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1194,6 +1220,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
 </div>
 
 <script src="bukeame-banners.js"></script>
+<script src="qr.js"></script>
 <script>
 const API = '/api';
 const token = localStorage.getItem('bukeame_token');
@@ -3460,6 +3487,115 @@ async function loadPayments(){
   list.innerHTML = r.data.providers.map(function(p){ return payCard(p, ath); }).join('');
   wirePayments();
   loadPendingGifts();
+  loadPlazos();
+}
+
+// ════════════════════════ PAGO A PLAZOS (Klarna, Affirm, Acima) ════════════════════════
+// Klarna y Affirm salen solos en la página de Stripe del negocio cuando los activa en SU
+// Stripe; con su cuenta directa, le manda el enlace desde el portal de ellos y aquí lo anota.
+// Acima va con el enlace de solicitud que le dio Acima y solo en artículos de $300 o más.
+let PLAZOS = null;
+async function getPlazos(force){
+  if(PLAZOS && !force) return PLAZOS;
+  const r = await api('GET','/plazos');
+  PLAZOS = r.ok ? r.data : null;
+  return PLAZOS;
+}
+async function loadPlazos(){
+  const box = document.getElementById('plazosBox');
+  if(!box) return;
+  const d = await getPlazos(true);
+  if(!d){ box.innerHTML=''; return; }   // sin la migración 41 no se enseña
+  box.innerHTML = renderPlazos(d);
+  wirePlazos();
+}
+function plazoEstado(nombre, x, d){
+  if(x.modo==='off') return '';
+  if(x.modo==='directo') return '<p class="plz-st">Con tu cuenta de '+nombre+': le mandas el enlace al cliente desde tu portal de '+nombre+' y aquí lo anotas al cobrar.</p>';
+  if(!d.stripe.conectado && d.stripe.payment_link) return '<p class="plz-st">Actívalo también en tu Payment Link de Stripe para que le salga al cliente.</p>';
+  if(x.en_stripe==='active') return '<p class="plz-st ok">Activo en tu Stripe. Le sale al cliente cuando paga con tarjeta, si el monto entra en lo que permite '+nombre+'.</p>';
+  if(x.en_stripe==='pending') return '<p class="plz-st">Stripe lo está revisando. Te sale aquí cuando lo aprueben.</p>';
+  return '<p class="plz-st warn">Falta activarlo en tu Stripe: Configuración → Métodos de pago → '+nombre+'. '+
+    '<a href="https://dashboard.stripe.com/settings/payment_methods" target="_blank" rel="noopener">Abrir mi Stripe</a> · '+
+    '<a href="#" class="plz-revisar">Ya lo activé</a></p>';
+}
+function plazoCard(key, nombre, x, d, notas){
+  const opt = function(v,t){ return '<option value="'+v+'"'+(x.modo===v?' selected':'')+'>'+t+'</option>'; };
+  return '<div class="card" style="display:block">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
+      '<b>'+nombre+'</b>'+
+      '<select class="plz-modo" data-k="'+key+'" '+(d.plan_locked?'disabled':'')+' style="padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;background:var(--card);color:var(--ink)">'+
+        opt('off','No lo ofrezco')+opt('stripe','Por mi Stripe')+opt('directo','Con mi cuenta de '+nombre)+
+      '</select>'+
+    '</div>'+
+    plazoEstado(nombre, x, d)+
+    '<p style="font-size:12px;color:var(--ink2);margin:8px 0 0;line-height:1.6">'+notas+'</p>'+
+  '</div>';
+}
+function renderPlazos(d){
+  let h = '<div class="seclabel" style="margin-top:18px">Pago a plazos</div>'+
+    '<p style="font-size:12.5px;color:var(--ink2);margin:0 0 10px;line-height:1.6">El cliente paga en partes y tú recibes el total de una vez. Klarna o Affirm le cobran las cuotas al cliente. Tú no prestas nada.</p>';
+  if(d.plan_locked) h += '<p style="font-size:12.5px;color:var(--ink2);margin:0 0 10px">Disponible desde el plan Pro, como los demás pagos en línea.</p>';
+  if(d.stripe.aviso) h += '<p style="font-size:12.5px;color:#9A5B12;margin:0 0 10px">'+esc(d.stripe.aviso)+'</p>';
+  h += plazoCard('klarna','Klarna', d.klarna, d,
+    'Sirve en Puerto Rico. Paga en 4 desde $1 hasta $2,000, o en meses hasta $10,000. Por tu Stripe, Stripe te cobra 5.99% + 30¢ por cada pago con Klarna. No se puede usar para vender gift cards.');
+  h += plazoCard('affirm','Affirm', d.affirm, d,
+    'Ojo: Affirm solo acepta clientes con dirección en EE. UU. y Canadá, no en Puerto Rico, así que a la mayoría de tus clientes no les va a salir. Desde $35 hasta $30,000. Por tu Stripe, Stripe te cobra 6% + 30¢ por cada pago con Affirm.');
+  const a = d.acima;
+  const min = money(a.min_cents).replace('.00','');
+  const elegibles = (a.productos||[]).filter(function(p){ return p.price_cents >= a.min_cents; });
+  h += '<div class="card" style="display:block">'+
+    '<b>Acima</b>'+
+    '<p style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.6">Arrendamiento con opción a compra, no un préstamo: el cliente se lleva el artículo y lo va pagando, y al final le sale más caro que de contado. Solo artículos duraderos de '+min+' o más (no servicios, ropa, gift cards ni cosas que se gastan). Necesitas tu propia cuenta de comerciante con Acima (<a href="https://www.acima.com/partner" target="_blank" rel="noopener">acima.com/partner</a>).</p>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<input type="url" id="plzAcimaLink" placeholder="Tu enlace de solicitud de Acima (https://…acima.com/…)" value="'+esc(a.link||'')+'" '+(d.plan_locked?'disabled':'')+' style="flex:1;min-width:0;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px">'+
+      '<button class="btn btn-teal btn-sm" id="plzAcimaSave" '+(d.plan_locked?'disabled':'')+'>Guardar</button>'+
+      (a.link ? '<button class="btn btn-ghost btn-sm" id="plzAcimaQuitar">Quitar</button>' : '')+
+    '</div>';
+  if(a.link){
+    h += '<div style="margin-top:12px;font-size:12.5px;color:var(--ink2)">Artículos de tu tienda que se pueden arrendar:</div>';
+    h += elegibles.length
+      ? elegibles.map(function(p){
+          return '<label style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer">'+
+            '<input type="checkbox" class="plz-acima-prod" data-id="'+esc(p.id)+'"'+(p.acima_ok?' checked':'')+'>'+
+            '<span style="flex:1;min-width:0">'+esc(p.name)+'</span><b>'+money(p.price_cents)+'</b></label>';
+        }).join('')
+      : '<p style="font-size:12.5px;color:var(--ink2);margin:6px 0 0">Ningún producto de tu tienda llega a '+min+' todavía.</p>';
+  }
+  h += '</div>';
+  return h;
+}
+function wirePlazos(){
+  document.querySelectorAll('.plz-modo').forEach(function(s){ s.onchange = async function(){
+    const body = {}; body[s.dataset.k] = s.value;
+    const r = await api('PUT','/plazos', body);
+    if(r.ok){ PLAZOS = r.data; document.getElementById('plazosBox').innerHTML = renderPlazos(r.data); wirePlazos(); showAlert('payAlert','Pago a plazos guardado.', true); }
+    else { showAlert('payAlert', (r.data&&r.data.error)||'No se pudo guardar.', false); loadPlazos(); }
+  };});
+  document.querySelectorAll('.plz-revisar').forEach(function(a){ a.onclick = async function(ev){
+    ev.preventDefault();
+    const r = await api('POST','/plazos/revisar');
+    if(r.ok){ PLAZOS = r.data; document.getElementById('plazosBox').innerHTML = renderPlazos(r.data); wirePlazos(); }
+  };});
+  const save = document.getElementById('plzAcimaSave');
+  if(save) save.onclick = async function(){
+    const v = (document.getElementById('plzAcimaLink').value||'').trim();
+    if(!v){ showAlert('payAlert','Pega tu enlace de solicitud de Acima.', false); return; }
+    save.disabled = true;
+    const r = await api('PUT','/plazos', { acima_link: v });
+    save.disabled = false;
+    if(r.ok){ PLAZOS = r.data; document.getElementById('plazosBox').innerHTML = renderPlazos(r.data); wirePlazos(); showAlert('payAlert','Enlace de Acima guardado.', true); }
+    else showAlert('payAlert', (r.data&&r.data.error)||'No se pudo guardar.', false);
+  };
+  const quitar = document.getElementById('plzAcimaQuitar');
+  if(quitar) quitar.onclick = async function(){
+    const r = await api('PUT','/plazos', { acima_link: null });
+    if(r.ok){ PLAZOS = r.data; document.getElementById('plazosBox').innerHTML = renderPlazos(r.data); wirePlazos(); }
+  };
+  document.querySelectorAll('.plz-acima-prod').forEach(function(c){ c.onchange = async function(){
+    const r = await api('PUT','/plazos/acima/productos/'+c.dataset.id, { acima_ok: c.checked });
+    if(!r.ok){ showAlert('payAlert', (r.data&&r.data.error)||'No se pudo guardar.', false); c.checked = !c.checked; }
+  };});
 }
 // Gift cards compradas pero PENDIENTES de pago: el negocio las confirma al recibir el dinero.
 async function loadPendingGifts(){
@@ -3610,8 +3746,122 @@ function openCobro(id, servicio, priceCents, membresia){
   document.getElementById('cobroTip').value = '';
   document.querySelectorAll('.paymethod').forEach(function(b){ b.classList.toggle('on', b.dataset.m==='cash'); });
   updateCobroTotal();
+  cobroLinkReset();
   cobroModal.classList.add('on');
+  cobroPlazosUI(id);
 }
+
+// ── Pago a plazos dentro del cobro: Klarna/Affirm/Acima por cuenta directa se anotan como
+//    método; con Stripe conectado, "Mandar enlace de pago" cobra el total por la página de
+//    Stripe del negocio (tarjeta, Klarna o Affirm) y la cita se completa sola al pagar. ──
+let cobroLink = null, cobroPoll = null;
+const NOMBRE_METODO = { card:'tarjeta', klarna:'Klarna', affirm:'Affirm' };
+function cobroLinkReset(){
+  if(cobroPoll){ clearInterval(cobroPoll); cobroPoll = null; }
+  cobroLink = null;
+  document.getElementById('cobroForm').style.display = '';
+  document.getElementById('cobroLinkBox').style.display = 'none';
+  document.getElementById('cobroLinkWrap').style.display = 'none';
+  document.getElementById('cobroLinkCopy').textContent = 'Copiar enlace';
+  ['klarna','affirm'].forEach(function(m){ var b = document.querySelector('.paymethod[data-m="'+m+'"]'); if(b) b.style.display='none'; });
+}
+async function cobroPlazosUI(apptId){
+  const d = await getPlazos(false);
+  if(!d || cobroId !== apptId) return;
+  const met = d.metodos || [];
+  const ver = function(m, si){ var b = document.querySelector('.paymethod[data-m="'+m+'"]'); if(b) b.style.display = (si && met.indexOf(m)>=0) ? '' : 'none'; };
+  ver('klarna', d.klarna.modo==='directo');
+  ver('affirm', d.affirm.modo==='directo');
+  const r = await api('GET','/plazos/cobros?appointment_id='+encodeURIComponent(apptId));
+  if(!r.ok || !r.data || cobroId !== apptId) return;
+  // Si ya pagó un depósito, se cobra lo que falta (si el negocio no cambió el monto todavía).
+  const dep = r.data.deposito_cents || 0;
+  if(dep > 0 && cobroPrice > 0){
+    const resto = Math.max(0, cobroPrice - dep);
+    const inp = document.getElementById('cobroAmt');
+    if(Math.round(parseFloat(inp.value)*100) === cobroPrice){ inp.value = (resto/100).toFixed(2); }
+    document.getElementById('cobroServicio').textContent += ' · Ya pagó '+money(dep)+' de depósito: falta '+money(resto)+'.';
+    cobroPrice = resto;
+    updateCobroTotal();
+  }
+  if(d.stripe.puede_cobrar && !d.plan_locked){
+    // Klarna y Affirm salen en la página de Stripe solo si el monto (y, en Affirm, la dirección
+    // del cliente) califican: aquí se dice así, sin prometerlos.
+    const klarna = d.klarna.modo==='stripe' && d.klarna.en_stripe==='active';
+    const affirm = d.affirm.modo==='stripe' && d.affirm.en_stripe==='active';
+    let nota = 'El cliente paga con tarjeta en la página segura de tu Stripe, desde su celular. La cita se completa sola cuando pague.';
+    if(klarna && affirm) nota += ' También le sale Klarna si el monto califica, y Affirm desde $35 si su dirección es de EE. UU. (no de Puerto Rico).';
+    else if(klarna) nota += ' También le sale Klarna si el monto califica.';
+    else if(affirm) nota += ' También le sale Affirm desde $35 si su dirección es de EE. UU. (no de Puerto Rico).';
+    document.getElementById('cobroLinkBtn').textContent = 'Mandar enlace de pago';
+    document.getElementById('cobroLinkNote').textContent = nota;
+    document.getElementById('cobroLinkWrap').style.display = '';
+    if(r.data.cobro) showCobroLink(r.data.cobro);
+  }
+}
+function showCobroLink(c){
+  cobroLink = c;
+  document.getElementById('cobroForm').style.display = 'none';
+  document.getElementById('cobroLinkBox').style.display = '';
+  const st = document.getElementById('cobroLinkStatus');
+  if(c.status === 'paid'){
+    st.textContent = 'Pagado: '+money(c.total_cents)+' con '+(NOMBRE_METODO[c.method]||'tarjeta')+'.';
+    document.getElementById('cobroLinkMsg').textContent = 'El cobro ya quedó anotado.';
+    document.getElementById('cobroQR').style.display = 'none';
+    document.getElementById('cobroLinkCopy').style.display = 'none';
+    document.getElementById('cobroLinkWa').style.display = 'none';
+    document.getElementById('cobroLinkCancel').style.display = 'none';
+    return;
+  }
+  ['cobroQR','cobroLinkCopy','cobroLinkWa','cobroLinkCancel'].forEach(function(i){ document.getElementById(i).style.display=''; });
+  st.textContent = 'Esperando el pago…';
+  document.getElementById('cobroLinkMsg').textContent = 'Enlace de '+money(c.total_cents)+'. Que el cliente escanee el código o mándale el enlace; escoge cómo pagar en la página segura de Stripe. Vence en 23 horas.';
+  const cv = document.getElementById('cobroQR'), ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  try { QRCode.renderToCanvas(QRCode.create(c.url,'M'), ctx, 0, 0, cv.width, 3, '#17150F', '#FFFFFF'); }
+  catch(e){ cv.style.display = 'none'; }
+  document.getElementById('cobroLinkWa').href = 'https://wa.me/?text='+encodeURIComponent('Aquí puedes pagar tu cita ('+money(c.total_cents)+'): '+c.url);
+  if(cobroPoll) clearInterval(cobroPoll);
+  const id = c.id;
+  cobroPoll = setInterval(async function(){
+    if(!cobroModal.classList.contains('on') || !cobroLink || cobroLink.id !== id){ clearInterval(cobroPoll); cobroPoll = null; return; }
+    const r = await api('GET','/plazos/cobros/'+encodeURIComponent(id));
+    if(!r.ok || !r.data) return;
+    if(r.data.status === 'paid'){
+      clearInterval(cobroPoll); cobroPoll = null;
+      showCobroLink(r.data);
+      setTimeout(function(){ if(cobroLink && cobroLink.id===id){ cobroModal.classList.remove('on'); loadDashboard(); } }, 1800);
+    } else if(r.data.status !== 'open'){
+      clearInterval(cobroPoll); cobroPoll = null;
+      cobroLinkReset(); cobroPlazosUI(cobroId);
+      showAlert('cobroAlert', r.data.status==='expired' ? 'El enlace venció sin pagarse.' : 'El enlace se canceló.', false);
+    }
+  }, 4000);
+}
+document.getElementById('cobroLinkBtn').onclick = async function(){
+  clearAlert('cobroAlert');
+  const amtVal = parseFloat(document.getElementById('cobroAmt').value);
+  if(isNaN(amtVal) || amtVal < 0){ showAlert('cobroAlert','Escribe el monto a cobrar.',false); return; }
+  const tip = parseFloat(document.getElementById('cobroTip').value) || 0;
+  const btn = this; btn.disabled = true;
+  const r = await api('POST','/plazos/cobros', { appointment_id: cobroId, amount_cents: Math.round(amtVal*100), tip_cents: Math.round(tip*100) });
+  btn.disabled = false;
+  if(r.ok && r.data && r.data.url) showCobroLink(r.data);
+  else showAlert('cobroAlert', (r.data && r.data.error) || 'No se pudo crear el enlace.', false);
+};
+document.getElementById('cobroLinkCopy').onclick = async function(){
+  if(!cobroLink || !cobroLink.url) return;
+  try { await navigator.clipboard.writeText(cobroLink.url); this.textContent = 'Copiado'; }
+  catch(e){ window.prompt('Copia el enlace:', cobroLink.url); }
+};
+document.getElementById('cobroLinkCancel').onclick = async function(){
+  if(!cobroLink) return;
+  const r = await api('POST','/plazos/cobros/'+encodeURIComponent(cobroLink.id)+'/cancelar');
+  if(!r.ok){ showAlert('cobroAlert', (r.data && r.data.error) || 'No se pudo cancelar el enlace.', false); return; }
+  if(r.data && r.data.status === 'paid'){ showCobroLink(r.data); return; }
+  cobroLinkReset(); cobroPlazosUI(cobroId);
+};
+document.getElementById('cobroLinkClose').onclick = function(){ cobroLinkReset(); cobroModal.classList.remove('on'); loadDashboard(); };
 function updateCobroTotal(){
   var amt = parseFloat(document.getElementById('cobroAmt').value);
   var amtCents = isNaN(amt) ? cobroPrice : Math.round(amt*100);
@@ -3627,7 +3877,7 @@ document.querySelectorAll('.paymethod').forEach(function(b){
 });
 document.getElementById('cobroTip').oninput = updateCobroTotal;
 document.getElementById('cobroAmt').oninput = updateCobroTotal;
-document.getElementById('cobroCancel').onclick = function(){ cobroModal.classList.remove('on'); };
+document.getElementById('cobroCancel').onclick = function(){ cobroLinkReset(); cobroModal.classList.remove('on'); };
 document.getElementById('cobroSave').onclick = async function(){
   const amtVal = parseFloat(document.getElementById('cobroAmt').value);
   if(isNaN(amtVal) || amtVal < 0){ showAlert('cobroAlert','Escribe el monto cobrado.',false); return; }
@@ -3641,7 +3891,10 @@ document.getElementById('cobroSave').onclick = async function(){
   });
   btn.disabled = false; btn.textContent = 'Completar y cobrar';
   if(r.ok){ cobroModal.classList.remove('on'); loadDashboard(); }
-  else { showAlert('cobroAlert', r.data.error || 'No se pudo completar', false); }
+  else {
+    showAlert('cobroAlert', r.data.error || 'No se pudo completar', false);
+    if(r.status === 409) loadDashboard();   // ya la cobró el enlace de pago
+  }
 };
 
 // ── Mover/Reagendar una cita: PATCH start_iso (el backend recalcula ends_at y

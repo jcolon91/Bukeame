@@ -351,6 +351,7 @@ html[data-theme="dark"] .alert.err{background:rgba(255,90,70,.14);color:#FFB3A8;
 .pd-buynow{background:transparent;border:1.5px solid var(--green);color:var(--green);font-weight:700}
 .pd-buynow:disabled{border-color:var(--border);color:var(--muted2);background:var(--card-soft)}
 .pd-pay{font-size:11.5px;color:var(--muted);text-align:center;margin-top:10px;font-family:var(--mono);letter-spacing:.01em}
+.pd-acima p{font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0 0}
 /* Layout 2 columnas en pantallas anchas */
 @media(min-width:720px){
   .pd-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start}
@@ -956,6 +957,12 @@ async function boot(){
     // ?reservar=1 (el botón "Reservar" del perfil de Google): abre la reserva de una vez. Se
     // quita de la dirección para que un reload (al terminar o al volver de pagar) no la reabra.
     var qs = new URLSearchParams(location.search);
+    // ?cobro=ok: volvió de pagar un enlace de cobro del negocio en Stripe.
+    if(qs.get('cobro') === 'ok'){
+      qs.delete('cobro');
+      try{ history.replaceState(history.state, '', location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash); }catch(e){}
+      if(window.bkToast) bkToast('Recibimos tu pago. ¡Gracias!');
+    }
     if(qs.get('reservar') === '1' && state.services.length){
       qs.delete('reservar');
       try{ history.replaceState(history.state, '', location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash); }catch(e){}
@@ -1188,10 +1195,12 @@ function renderProfile(){
   if(b.deposit_default_cents>0) pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">Depósito</span><span class="val">Algunos servicios requieren un depósito al reservar.</span></div>');
   if(b.no_show_policy) pol.push('<div class="inforow"><span class="ic">'+ICONS.doc+'</span><span class="lbl" style="min-width:0">No-show</span><span class="val">'+esc(b.no_show_policy)+'</span></div>');
   if(state.payment_methods && state.payment_methods.length){
-    var PAYLBL = { ath_movil:'ATH Móvil', cash:'Efectivo', stripe:'Tarjeta · Apple Pay · Google Pay · Klarna', paypal:'PayPal' };
-    var pm = state.payment_methods.map(function(p){ return PAYLBL[p]||p; }).join(' · ');
+    var PAYLBL = { ath_movil:'ATH Móvil', ath_movil_business:'ATH Móvil', cash:'Efectivo', stripe:cardLabel(), paypal:'PayPal' };
+    var pm = state.payment_methods.map(function(p){ return PAYLBL[p]||p; })
+      .filter(function(v,i,a){ return a.indexOf(v)===i; }).join(' · ');
     pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">Pagos</span><span class="val">'+esc(pm)+'</span></div>');
   }
+  if(plazosResumen()) pol.push('<div class="inforow"><span class="ic">'+ICONS.dollar+'</span><span class="lbl" style="min-width:0">A plazos</span><span class="val">'+esc(plazosResumen())+'</span></div>');
   if(pol.length){
     document.getElementById('sec-policies').style.display='block';
     document.getElementById('policyList').innerHTML = pol.join('');
@@ -1943,14 +1952,14 @@ function renderPayStep(appt, depCents){
     hasAny = true;
     var sb = document.createElement('button');
     sb.className='paybtn'; sb.type='button';
-    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay · Klarna</small></span>';
+    sb.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>'+esc(cardLabel(depCents))+'</small></span>';
     sb.onclick = function(){ startStripeCheckout(code, sb); };
     host.appendChild(sb);
   } else if(stripe && stripe.payment_link){
     hasAny = true;
     var sbl = document.createElement('button');
     sbl.className='paybtn'; sbl.type='button';
-    sbl.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>Tarjeta · Apple Pay · Google Pay</small></span>';
+    sbl.innerHTML = '<span class="pmico">'+ICONS.card+'</span><span class="pmtxt">Pagar con tarjeta<small>'+esc(cardLabel(depCents))+'</small></span>';
     sbl.onclick = function(){ window.open(stripe.payment_link, '_blank', 'noopener'); };
     host.appendChild(sbl);
   }
@@ -2159,6 +2168,38 @@ async function openProductDetail(id){
   renderProductDetail(res.data);
 }
 
+// ── Pago a plazos (payment_config.plazos): Klarna/Affirm por el Stripe del negocio salen
+//    en su página de pago con tarjeta; con su cuenta directa, el negocio manda el enlace.
+//    Acima: solo en los artículos que el negocio marcó, de $300 o más. ──
+// En el botón de tarjeta solo va Klarna, y solo si el monto entra en alguno de sus planes
+// ($1 a $10,000). Affirm no va en el botón: no le sale a clientes de Puerto Rico y empieza
+// en $35; se explica en la fila "A plazos".
+function cardLabel(amountCents){
+  var pz = (state.payment_config||{}).plazos || {};
+  var x = ['Tarjeta','Apple Pay','Google Pay'];
+  var c = Number(amountCents);
+  if(pz.klarna==='stripe' && c>=100 && c<=1000000) x.push('Klarna');
+  return x.join(' · ');
+}
+function plazosResumen(){
+  var pz = (state.payment_config||{}).plazos || {};
+  var x = [];
+  if(pz.klarna==='stripe') x.push('Klarna al pagar con tarjeta');
+  else if(pz.klarna==='directo') x.push('Klarna (el negocio te manda el enlace)');
+  if(pz.affirm==='stripe') x.push('Affirm al pagar con tarjeta, desde $35 (solo direcciones de EE. UU.)');
+  else if(pz.affirm==='directo') x.push('Affirm (el negocio te manda el enlace; solo direcciones de EE. UU.)');
+  if(pz.acima && pz.acima.link) x.push('Acima en artículos de '+money(pz.acima.min_cents).replace('.00','')+' o más');
+  return x.join(' · ');
+}
+function acimaBlock(p, soldOut){
+  var pz = (state.payment_config||{}).plazos || {};
+  if(!pz.acima || !pz.acima.link || !p.acima_ok || soldOut || Number(p.price_cents) < pz.acima.min_cents) return '';
+  return '<div class="pd-acima">'+
+    '<a class="btn pd-buynow" href="'+esc(pz.acima.link)+'" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:10px;text-decoration:none">Arriéndalo con Acima</a>'+
+    '<p>Acima es arrendamiento con opción a compra, no un préstamo: te llevas el artículo y lo vas pagando, y si haces todos los pagos te sale más caro que el precio de contado. Solicitas en la página de Acima; cuando te aprueben, avísale al negocio para que te lo entregue.</p>'+
+  '</div>';
+}
+
 function renderProductDetail(data){
   var p = data.product || {};
   var photos = Array.isArray(data.photos) ? data.photos : [];
@@ -2263,6 +2304,7 @@ function renderProductDetail(data){
         featuresBlock+
         varBlock+
         addBlock+
+        acimaBlock(p, soldOut)+
       '</div>'+
     '</div>'+
     '<div class="pd-sectitle" id="pdReviewsAnchor">Reseñas de clientes</div>'+
@@ -2473,7 +2515,7 @@ function renderOrderPay(){
   var opts = [];
   if(cfg.ath_business && cfg.ath_business.enabled) opts.push({v:'ath_business', t:'ATH Móvil — pago automático'});
   var stripe = cfg.stripe || {};
-  if(stripe.connected || stripe.stripe_can_charge) opts.push({v:'card', t:'Tarjeta · Apple Pay · Google Pay'});
+  if(stripe.connected || stripe.stripe_can_charge) opts.push({v:'card', t:cardLabel(cartTotal())});
   if(cfg.ath_manual && cfg.ath_manual.phone) opts.push({v:'ath_manual', t:'ATH Móvil al '+cfg.ath_manual.phone+' — el negocio valida'});
   if(cfg.cash && cfg.cash.enabled) opts.push({v:'cash', t:'Efectivo / en persona — el negocio valida'});
   if(!opts.length){ host.innerHTML=''; state.orderPay=null; return; }

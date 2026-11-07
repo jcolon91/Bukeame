@@ -138,6 +138,10 @@ app.post('/api/payments/stripe/webhook',
     let event;
     try { event = JSON.parse(rawStr); }
     catch { return res.status(400).json({ error: 'JSON inválido' }); }
+    // El endpoint de Connect también recibe los eventos de PRUEBA de las cuentas conectadas:
+    // con la llave de producción, un pago de prueba no confirma nada.
+    if (event && event.livemode === false && /^sk_live_/.test(process.env.STRIPE_SECRET_KEY || ''))
+      return res.json({ received: true });
 
     const type = event && event.type;
     const obj  = (event && event.data && event.data.object) || {};
@@ -265,6 +269,19 @@ app.post('/api/payments/stripe/webhook',
           });
         }
         catch (e) { console.error('stripe membresía:', e.message); return res.status(500).json({ error: 'reintentar' }); }
+      }
+
+      // ── Cobro por enlace desde el panel (metadata kind='cobro'): tarjeta, Klarna o Affirm ──
+      // El módulo exige la cuenta Stripe del negocio, el total exacto y que esté cobrado; la
+      // cita y el monto salen de la fila, nunca de la metadata. Idempotente.
+      if (md.kind === 'cobro' && isUuid(String(md.cobro_id || '')) && sharedHelpers.plazos) {
+        try {
+          await sharedHelpers.plazos.cobroPagado(String(md.cobro_id), {
+            ...pago, ref: extRef,
+            pi: type === 'payment_intent.succeeded' ? obj.id : obj.payment_intent,
+          });
+        }
+        catch (e) { console.error('stripe cobro:', e.message); return res.status(500).json({ error: 'reintentar' }); }
       }
     }
     // Firma válida ⇒ 200 siempre (aplique o no el evento).
@@ -2253,6 +2270,7 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
     // rating_avg (1 decimal) / rating_count salen de product_reviews (migración 12).
     db.query(`SELECT p.id, p.name, p.description, p.price_cents, p.stock, p.variants,
                      p.category, p.tagline,
+                     COALESCE((to_jsonb(p)->>'acima_ok')::boolean, false) AS acima_ok,
                      COALESCE(
                        (SELECT json_agg(pp.url ORDER BY pp.id)
                           FROM product_photos pp WHERE pp.product_id = p.id),
@@ -2313,6 +2331,9 @@ app.get('/api/public/:slug', publicLimiter, asyncH(async (req, res) => {
       [biz.id]).catch(() => ({ rows: [{ ok: false }] })),
   ]);
   const payment_config = buildPaymentConfig(payMethods.rows);
+  // Pago a plazos (Klarna, Affirm, Acima): qué ofrece y por dónde. Resiliente sin la migración 41.
+  try { payment_config.plazos = sharedHelpers.plazos ? await sharedHelpers.plazos.publico(biz.id) : null; }
+  catch (e) { payment_config.plazos = null; }
   delete biz.branding_ok;   // uso interno (galería); no se expone
   biz.memberships_enabled = !!membresias.rows[0].ok;
   biz.memberships_redeem = !!(membresias.rows[0].ok || membresias.rows[0].redeem);
@@ -2344,7 +2365,8 @@ app.get('/api/public/:slug/products/:id', publicLimiter, asyncH(async (req, res)
   if (!biz) return bad(res, 'Negocio no encontrado', 404);
 
   const prod = await db.query(
-    `SELECT id, name, description, price_cents, stock, variants, category, tagline, features
+    `SELECT id, name, description, price_cents, stock, variants, category, tagline, features,
+            COALESCE((to_jsonb(products)->>'acima_ok')::boolean, false) AS acima_ok
        FROM products WHERE id = $1 AND business_id = $2 AND is_active = true`,
     [req.params.id, biz.id]);
   if (!prod.rows[0]) return bad(res, 'Producto no encontrado', 404);
@@ -3449,6 +3471,14 @@ app.patch('/api/appointments/:id', authRequired, businessScope, asyncH(async (re
   // Avisos al cliente que salen al final (si todo lo de abajo se guardó).
   const clientMsgs = [];
 
+  // Si hay un enlace de pago abierto (pago a plazos), se cierra en Stripe antes de completar,
+  // cancelar o marcar que no llegó: si no, el cliente lo podría pagar después.
+  if (['completed', 'no_show', 'cancelled_business'].includes(status) && sharedHelpers.plazos) {
+    const enl = await sharedHelpers.plazos.cerrarAbiertos({ appointmentId: appt.id });
+    if (enl === 'pagada') return bad(res, 'El cliente ya pagó con el enlace de pago: la cita quedó cobrada.', 409);
+    if (enl === 'error') return bad(res, 'Hay un enlace de pago abierto y no pudimos cerrarlo en Stripe. Intenta otra vez en un momento.', 502);
+  }
+
   if (start_iso) {   // reagendar
     const starts = new Date(start_iso);
     if (isNaN(starts)) return bad(res, 'Horario inválido');
@@ -3467,21 +3497,26 @@ app.patch('/api/appointments/:id', authRequired, businessScope, asyncH(async (re
 
   if (status) {
     if (!['completed','no_show','cancelled_business','confirmed'].includes(status)) return bad(res, 'Estado inválido');
-    await db.query(`UPDATE appointments SET status = $1::appointment_status,
+    // Completar una cita que ya estaba completada (otro equipo, o el webhook del enlace de
+    // pago) no vuelve a contar la visita: el UPDATE solo cambia si no lo estaba.
+    const cambio = await db.query(`UPDATE appointments SET status = $1::appointment_status,
         cancelled_at = CASE WHEN $1::appointment_status = 'cancelled_business' THEN now() ELSE cancelled_at END
-      WHERE id = $2`, [status, appt.id]);
+      WHERE id = $2 ${status === 'completed' ? "AND status <> 'completed'" : ''}`, [status, appt.id]);
     if (status === 'completed') {
       // Monto REALMENTE cobrado: el negocio puede ajustarlo al completar (trabajo
       // extra, ajuste de precio). Si no lo manda, se usa el precio del servicio, o $0
       // si la cubrió una membresía (ya se pagó al comprarla).
       const amt = Number.isInteger(req.body?.amount_cents) && req.body.amount_cents >= 0 && req.body.amount_cents <= 100000000
         ? req.body.amount_cents : (appt.membership_id && appt.membership_visits ? 0 : appt.price_cents);
-      await db.query(`UPDATE clients SET total_visits = total_visits + 1,
-          total_spent_cents = total_spent_cents + $2, last_visit_at = now() WHERE id = $1`,
-        [appt.client_id, amt]);
+      if (cambio.rowCount)
+        await db.query(`UPDATE clients SET total_visits = total_visits + 1,
+            total_spent_cents = total_spent_cents + $2, last_visit_at = now() WHERE id = $1`,
+          [appt.client_id, amt]);
       // Registrar el pago de la cita (monto cobrado + propina) si se indicó método.
       // Evita duplicar si ya existe un pago 'balance' para esta cita.
-      const method = ['cash','ath_movil','card'].includes(req.body?.payment_method) ? req.body.payment_method : null;
+      // Klarna y Affirm por la cuenta directa del negocio (migración 41), si ya existen.
+      const metodos = ['cash','ath_movil','card', ...(sharedHelpers.plazos ? sharedHelpers.plazos.metodosCita() : [])];
+      const method = metodos.includes(req.body?.payment_method) ? req.body.payment_method : null;
       const tip = Number.isInteger(req.body?.tip_cents) && req.body.tip_cents >= 0 && req.body.tip_cents <= 100000000
         ? req.body.tip_cents : 0;
       // Con $0 y sin propina no hay nada que anotar (antes daba error: el pago exige monto).
@@ -4710,7 +4745,7 @@ async function slotsDelDia(biz, serviceId, dateStr) {
 const sharedHelpers = {
   vozLista, recuperaLista, addonVendible, slotsDelDia,
   asyncH, bad, isStr, isUuid, isEmail, isPhone, normPhone, isDate, audit, notify,
-  confirmCode, bookingLimiter, codeLimiter, publicLimiter,
+  confirmCode, bookingLimiter, codeLimiter, publicLimiter, SQL_PAID_OK,
   sendEmail, sendWhatsApp, emailPlatformReceipt, emailReceipt, emailGiftCard,
   enqueueApptConfirm, alertOwner, fmtPR, oneLine, citaUrl,
   // 2FA/TOTP (crypto puro) para el panel admin:
@@ -4793,6 +4828,14 @@ try {
   setInterval(() => { mudanza.limpiar().catch(e => console.error('mudanza:', e.message)); }, 3600_000);
 } catch (e) {
   console.error('⚠ Error montando la mudanza:', e.message);
+}
+// Pago a plazos: Klarna y Affirm por el Stripe del negocio o su cuenta directa, Acima con su
+// enlace, y el cobro por enlace del panel. El webhook de Connect lo usa por h.plazos.
+try {
+  sharedHelpers.plazos = require('./module-plazos').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  setInterval(() => { sharedHelpers.plazos.limpiar().catch(e => console.error('plazos:', e.message)); }, 3600_000);
+} catch (e) {
+  console.error('⚠ Error montando el pago a plazos:', e.message);
 }
 
 // ============================================================================

@@ -26,7 +26,7 @@ module.exports.mount = function (app, ctx) {
 
   // Catálogo de proveedores. external=true → requiere onboarding con cuenta externa.
   const PROVIDERS = {
-    stripe:             { name: 'Stripe · Tarjetas · Klarna', external: true },
+    stripe:             { name: 'Stripe · Tarjetas · Apple Pay · Google Pay', external: true },
     paypal:             { name: 'PayPal',     external: true },
     ath_movil:          { name: 'ATH Móvil (tú validas)',  external: false },
     ath_movil_business: { name: 'ATH Móvil Negocios (automático)', external: false },
@@ -248,6 +248,11 @@ module.exports.mount = function (app, ctx) {
   app.post('/api/payments/providers/:provider/disconnect', authRequired, businessScope, asyncH(async (req, res) => {
     const provider = req.params.provider;
     if (!PROVIDERS[provider]) return bad(res, 'Proveedor inválido', 404);
+    // Los enlaces de pago abiertos se cierran antes: después ya no habría con qué cerrarlos.
+    if (provider === 'stripe' && h.plazos) {
+      const enl = await h.plazos.cerrarAbiertos({ businessId: req.business.id });
+      if (enl === 'error') return bad(res, 'Tienes enlaces de pago abiertos y no pudimos cerrarlos en Stripe. Intenta otra vez en un momento.', 502);
+    }
     await db.query(
       `UPDATE payment_providers
           SET status='not_connected', is_enabled=false, account_ref=NULL,

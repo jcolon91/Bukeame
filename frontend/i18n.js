@@ -17,7 +17,8 @@
     'Agenda':'Schedule','Servicios':'Services','Equipo':'Team','Clientes':'Clients','Lealtad':'Loyalty','Membresías':'Memberships',
     'Tienda':'Store','Lista de espera':'Waitlist','Órdenes':'Orders','Horario':'Hours','Contabilidad':'Accounting',
     'Mi negocio':'My business','Pagos':'Payments','Promociones':'Promotions','Marketing':'Marketing',
-    'Referidos':'Referrals','Mudanza':'Move to Bukéame','Mudarme':'Move my data','Ahora no':'Not now','Antes de Bukéame':'Before Bukéame','Mi cuenta':'My account','Kit de marca':'Brand kit','Cerrar sesión':'Log out',
+    'Referidos':'Referrals','Mudanza':'Move to Bukéame','Mudarme':'Move my data','Ahora no':'Not now','Antes de Bukéame':'Before Bukéame',
+    'Pago a plazos':'Pay over time','A plazos':'Pay over time','Copiar enlace':'Copy link','Enviar por WhatsApp':'Send by WhatsApp','Cancelar el enlace':'Cancel the link','Arriéndalo con Acima':'Lease it with Acima','No lo ofrezco':"I don't offer it",'Por mi Stripe':'Through my Stripe','Mi cuenta':'My account','Kit de marca':'Brand kit','Cerrar sesión':'Log out',
     // --- Acciones / botones ---
     'Reservar':'Book','Reservar ahora':'Book now','Reserva ahora':'Book now','Reserva':'Book',
     'Cancelar':'Cancel','Guardar':'Save','Guardar cambios':'Save changes','Confirmar':'Confirm','Aceptar':'Accept',
