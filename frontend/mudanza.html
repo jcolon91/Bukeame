@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mudanza a Bukéame</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Pasa a Bukéame lo que tenías en Booksy, Fresha, GOLDIE, Square, Vagaro o en tu libreta: servicios, clientes, citas, historial, ventas y saldos.">
+<meta name="theme-color" content="#0E8074">
+<link rel="canonical" href="https://bukeame.com/mudanza.html">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E8074'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='%23fff' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#F1EFE5;--bg2:#F7F4EA;--card:#FFFFFF;--card-soft:#EDE9DB;--border:#E1DCCD;
+--text:#17150F;--muted:#5E594B;--muted2:#B3AD9C;--green:#0E8074;--green-ink:#FFFFFF;
+--green-soft:#E3EFE9;--green-glow:rgba(14,128,116,.45);--warn-ink:#8a5a13;--warn-bg:#FBEFD8;--red:#C0392B;
+--awning:repeating-linear-gradient(90deg,#0E8074 0 26px,#0A5B52 26px 28px,#F8F5EA 28px 54px,#E7E2D1 54px 56px);
+--display:"Bricolage Grotesque",sans-serif;--body:"Instrument Sans",sans-serif;--mono:"Spline Sans Mono",monospace}
+html[data-theme="dark"]{color-scheme:dark;
+--bg:#0B1A13;--bg2:#0E2218;--card:#12251B;--card-soft:rgba(255,255,255,.05);--border:rgba(255,255,255,.1);
+--text:#ECEAE0;--muted:#8AA197;--muted2:#5d6f66;--green:#36E27B;--green-ink:#08160F;
+--green-soft:rgba(54,226,123,.12);--green-glow:rgba(54,226,123,.3);--warn-ink:#EFB85C;--warn-bg:rgba(239,161,47,.18);--red:#FF8F80;
+--awning:repeating-linear-gradient(90deg,#36E27B 0 26px,#0d6b46 26px 28px,#0E2218 28px 54px,#10241A 54px 56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.bootload{min-height:100vh;display:grid;place-items:center;color:var(--muted);font-size:14px;padding:20px;text-align:center}
+.nav{background:var(--card);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.nav a.back{font-size:18px}.nav .logo{font-family:var(--display);font-weight:800;font-size:19px}.nav .logo i{font-style:normal;color:var(--green)}
+.nav .spacer{flex:1}
+.theme-tg{display:inline-flex;gap:2px;background:var(--card-soft);border:1px solid var(--border);border-radius:999px;padding:3px}
+.theme-tg button{font:700 11.5px 'Instrument Sans',sans-serif;padding:6px 12px;border-radius:999px;line-height:1;cursor:pointer;border:0;background:transparent;color:var(--muted)}
+.theme-tg button.on{background:var(--green);color:var(--green-ink)}
+.wrap{max-width:720px;margin:0 auto;padding:24px 16px 60px}
+h1{font-family:var(--display);font-weight:800;font-size:27px;letter-spacing:-.025em;margin-bottom:5px}
+.sub{font-size:13.5px;color:var(--muted);margin-bottom:8px;line-height:1.55}
+.seclabel{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:28px 0 12px}
+.seclabel::after{content:"";flex:1;height:1px;background:var(--border)}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px}
+.card h2{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.015em;margin-bottom:4px}
+.card h3{font-size:15px;font-weight:700;word-break:break-word}
+.lead{font-size:13.5px;color:var(--muted);line-height:1.55;margin-bottom:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:14px;padding:12px 18px;border-radius:14px;background:var(--green);color:var(--green-ink);transition:filter .15s}
+.btn:hover{filter:brightness(1.06)}.btn:disabled{opacity:.55;cursor:default}
+.btn-ghost{background:var(--card-soft);color:var(--text);border:1.5px solid var(--border);padding:9px 13px;font-size:13px;border-radius:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.btn-ghost:disabled{opacity:.5;cursor:default}
+.btn-ghost.danger{color:var(--red)}
+.plats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.plat{border:1.5px solid var(--border);background:var(--bg2);border-radius:14px;padding:14px;text-align:left;font-weight:700;font-size:14.5px;transition:border-color .15s}
+.plat small{display:block;font-weight:500;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35}
+.plat:hover{border-color:var(--green)}
+.plat.on{border-color:var(--green);background:var(--green-soft)}
+.pasos{counter-reset:p;margin:4px 0 6px}
+.paso{counter-increment:p;display:grid;grid-template-columns:34px 1fr;gap:10px;padding:11px 0;border-top:1px solid var(--border);font-size:13.5px;line-height:1.55}
+.paso:first-child{border-top:0}
+.paso::before{content:counter(p,decimal-leading-zero);font-family:var(--mono);font-weight:700;font-size:12px;color:var(--green);padding-top:2px}
+.drop{border:2px dashed var(--border);border-radius:16px;padding:22px 16px;text-align:center;background:var(--bg2);transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--green);background:var(--green-soft)}
+.drop p{font-size:13.5px;color:var(--muted);line-height:1.5;margin:8px 0 12px}
+.drop b{color:var(--text)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.pend{margin-top:12px}
+.pend .f{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:9px 0;border-top:1px solid var(--border);font-size:13.5px}
+.pend .f:first-child{border-top:0}
+.pend .f span{word-break:break-word}
+.pend .f em{font-style:normal;font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.rowx{color:var(--muted);font-size:18px;line-height:1;padding:2px 6px}
+.resumen{font-size:15px;line-height:1.6}
+.resumen b{font-family:var(--mono);font-weight:700;color:var(--green)}
+.fhead{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}
+.fhead .left{flex:1;min-width:200px}
+.fhead .left small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+select,input[type=number],input[type=text],input[type=search]{font:inherit;font-size:13.5px;padding:9px 10px;border-radius:11px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text);max-width:100%}
+select:focus,input:focus{outline:2px solid var(--green);outline-offset:1px;border-color:transparent}
+.cuenta{font-size:13.5px;line-height:1.55;color:var(--muted);margin:6px 0 10px}
+.cuenta b{color:var(--text)}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 4px}
+.tbl th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:6px 8px 6px 0;border-bottom:1px solid var(--border)}
+.tbl td{padding:7px 8px 7px 0;border-bottom:1px solid var(--border);vertical-align:top;word-break:break-word}
+.tbl tr:last-child td{border-bottom:0}
+.scroll{overflow-x:auto}
+details{margin-top:8px;border-top:1px solid var(--border);padding-top:8px}
+summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--green);padding:4px 0;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+ ";font-family:var(--mono)}
+details[open] summary::before{content:"– "}
+.map{display:grid;grid-template-columns:minmax(120px,1fr) minmax(140px,1.4fr);gap:8px 12px;align-items:center;margin-top:8px;font-size:13px}
+.map label{color:var(--muted)}
+.map label.req::after{content:" *";color:var(--red)}
+.fuera{font-size:12.5px;color:var(--muted);line-height:1.5;padding:5px 0;border-top:1px solid var(--border)}
+.fuera:first-child{border-top:0}
+.fuera b{font-family:var(--mono);color:var(--text);font-weight:600}
+.warnbox{background:var(--warn-bg);color:var(--warn-ink);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5;margin:8px 0}
+.okbox{background:var(--green-soft);color:var(--green);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5;margin:8px 0}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.5;padding:9px 0;cursor:pointer}
+.chk input{margin-top:3px;width:17px;height:17px;accent-color:var(--green);flex:none}
+.opt{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13.5px;padding:9px 0;border-top:1px solid var(--border)}
+.opt:first-child{border-top:0}
+.opt span{flex:1;min-width:200px;line-height:1.5}
+.alert{display:none;font-size:13px;font-weight:600;padding:11px 13px;border-radius:12px;margin-bottom:12px;line-height:1.45}
+.alert.err{display:block;background:#FCE8E6;color:#A1281C;border:1px solid #F3C0BA}
+html[data-theme="dark"] .alert.err{background:rgba(225,75,60,.14);color:#FF9A8E;border-color:rgba(225,75,60,.35)}
+.alert.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid var(--green-glow)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+.hist{padding:12px 0;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.hist:first-child{border-top:0;padding-top:2px}
+.hist p{font-size:13.5px;line-height:1.5;flex:1;min-width:220px}
+.hist small{display:block;color:var(--muted);font-size:12px}
+.modal{position:fixed;inset:0;background:rgba(10,15,12,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}
+.modal.on{display:flex}
+.modal .box{background:var(--card);border-radius:18px;width:100%;max-width:560px;padding:20px;max-height:90vh;display:flex;flex-direction:column}
+.modal .box.small{max-width:420px}
+.modal .body{overflow:auto;flex:1;margin:10px 0}
+.modal .foot-btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.crow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--border);font-size:13.5px;cursor:pointer}
+.crow:first-child{border-top:0}
+.crow input{width:17px;height:17px;accent-color:var(--green);flex:none}
+.crow small{display:block;color:var(--muted);font-family:var(--mono);font-size:11.5px}
+.srow{display:grid;grid-template-columns:1fr 92px 92px 28px;gap:6px;padding:5px 0;align-items:center}
+.srow input{width:100%;padding:8px 9px}
+.foot{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 0 40px}
+@media(max-width:520px){.map{grid-template-columns:1fr}.map label{margin-top:4px}.srow{grid-template-columns:1fr 70px 70px 26px}}
+</style>
+<script src="bukeame-core.js"></script>
+</head>
+<body>
+<script>
+(function(){var t=localStorage.getItem('bukeame_theme')||'dark';document.documentElement.setAttribute('data-theme',t);
+window.__setTheme=function(t){localStorage.setItem('bukeame_theme',t);document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.theme-tg button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-theme-set')===t);});};
+document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[data-theme-set]').forEach(function(b){b.addEventListener('click',function(){window.__setTheme(b.getAttribute('data-theme-set'));});});window.__setTheme(localStorage.getItem('bukeame_theme')||'dark');});})();
+</script>
+<div id="boot" class="bootload">Cargando…</div>
+<div id="app" style="display:none">
+<nav class="nav"><a href="panel.html" class="back" aria-label="Volver al panel">←</a><span class="logo">Buk<i>é</i>ame</span><span class="spacer"></span><div class="theme-tg"><button type="button" data-theme-set="light">Claro</button><button type="button" data-theme-set="dark">Oscuro</button></div></nav>
+<div style="height:12px;background:var(--awning)"></div>
+<div class="wrap">
+  <h1>Mudanza a Bukéame</h1>
+  <p class="sub">Trae lo que tenías en tu otra plataforma o en tu libreta: tus servicios, tus clientes, las citas que vienen, su historial, tus ventas y lo que les debes (tarjetas de regalo, paquetes y puntos). Nada se guarda hasta que veas el resumen y digas que sí, y lo puedes deshacer durante 7 días.</p>
+  <div id="content"></div>
+</div>
+</div>
+
+<div class="modal" id="askModal" role="dialog" aria-modal="true" aria-labelledby="askText">
+  <div class="box small">
+    <p id="askText" style="font-size:14.5px;line-height:1.55"></p>
+    <div class="foot-btns" style="margin-top:14px"><button type="button" class="btn-ghost" id="askNo">No</button><button type="button" class="btn" id="askYes" style="padding:10px 16px;font-size:13.5px">Sí</button></div>
+  </div>
+</div>
+<div class="modal" id="contModal" role="dialog" aria-modal="true" aria-labelledby="contTitle">
+  <div class="box">
+    <h2 id="contTitle" style="font-family:var(--display);font-weight:800;font-size:19px">¿Cuáles son clientes?</h2>
+    <p class="lead" style="margin:4px 0 8px">Quita a tu familia, a tus amigos y a quien no sea cliente. Solo pasan los que dejes marcados.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="search" id="contBuscar" placeholder="Buscar por nombre o teléfono" style="flex:1;min-width:180px">
+      <button type="button" class="btn-ghost" id="contTodos">Marcar todos</button>
+      <button type="button" class="btn-ghost" id="contNinguno">Ninguno</button>
+    </div>
+    <div class="body" id="contLista"></div>
+    <div class="foot-btns"><span class="muted" id="contCuenta" style="flex:1;font-size:13px;align-self:center"></span><button type="button" class="btn-ghost" id="contNo">Cancelar</button><button type="button" class="btn" id="contSi" style="padding:10px 16px;font-size:13.5px">Usar estos</button></div>
+  </div>
+</div>
+<div class="modal" id="fotoModal" role="dialog" aria-modal="true" aria-labelledby="fotoTitle">
+  <div class="box">
+    <h2 id="fotoTitle" style="font-family:var(--display);font-weight:800;font-size:19px">Revisa lo que leí de la foto</h2>
+    <p class="lead" style="margin:4px 0 8px">Corrige lo que no esté bien y quita lo que sobre. Si la foto no decía la duración, la dejo vacía y en Bukéame va de 30 minutos: cámbiala aquí o después en Servicios.</p>
+    <div class="srow" style="font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)"><span>Servicio</span><span>Precio</span><span>Duración</span><span></span></div>
+    <div class="body" id="fotoLista"></div>
+    <div class="foot-btns"><button type="button" class="btn-ghost" id="fotoMas" style="margin-right:auto">Añadir uno</button><button type="button" class="btn-ghost" id="fotoNo">Cancelar</button><button type="button" class="btn" id="fotoSi" style="padding:10px 16px;font-size:13.5px">Usar estos servicios</button></div>
+  </div>
+</div>
+<input type="file" id="pickFiles" multiple accept=".csv,.txt,.tsv,.xlsx,.xls,.ods,.zip,.vcf,text/csv,text/vcard" hidden>
+<input type="file" id="pickFoto" accept="image/*" hidden>
+<div class="foot">Hecho con Bukéame · bukeame.com</div>
+
+<script>
+const API='/api';
+const token=localStorage.getItem('bukeame_token');
+if(!token){ location.href='acceso.html'; }
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function api(method,path,body){
+  const opts={method,headers:{'Authorization':'Bearer '+token}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  let r;
+  try{ r=await fetch(API+path,opts); }catch(e){ return {status:0,ok:false,data:{error:'No hay conexión. Revisa tu internet e intenta otra vez.'}}; }
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  if(r.status===413) data={error:'Los archivos son demasiado grandes para subirlos juntos. Súbelos de uno en uno.'};
+  return {status:r.status,ok:r.ok,data};
+}
+// Las filas suben comprimidas (gzip): un archivo de miles de clientes pesa 5 o 10 veces menos.
+async function apiGrande(method,path,body){
+  const json=JSON.stringify(body);
+  if(!('CompressionStream' in window)||json.length<100000) return api(method,path,body);
+  let r;
+  try{
+    const buf=await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+    r=await fetch(API+path,{method,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json','Content-Encoding':'gzip'},body:buf});
+  }catch(e){ return {status:0,ok:false,data:{error:'No hay conexión. Revisa tu internet e intenta otra vez.'}}; }
+  if(r.status===401){localStorage.clear();location.href='acceso.html';throw new Error('s');}
+  let data={};try{data=await r.json();}catch(e){}
+  if(r.status===413) data={error:'Los archivos son demasiado grandes para subirlos juntos. Súbelos de uno en uno.'};
+  return {status:r.status,ok:r.ok,data};
+}
+const num=n=>Number(n||0).toLocaleString('en-US');
+const dinero=c=>(c<0?'-':'')+'$'+(Math.abs(Number(c||0))/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fecha=s=>{ try{ return new Date(s).toLocaleDateString('es-PR',{timeZone:'America/Puerto_Rico',day:'numeric',month:'long',year:'numeric'}); }catch(e){ return ''; } };
+const fechaHora=s=>{ try{ return new Date(s).toLocaleString('es-PR',{timeZone:'America/Puerto_Rico',weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } };
+const pl=(n,a,b)=>num(n)+' '+(n===1?a:b);
+function askConfirm(text,yes){
+  return new Promise(res=>{
+    const m=document.getElementById('askModal');
+    document.getElementById('askText').textContent=text;
+    document.getElementById('askYes').textContent=yes||'Sí';
+    m.classList.add('on');
+    const done=v=>{ m.classList.remove('on'); res(v); };
+    document.getElementById('askYes').onclick=()=>done(true);
+    document.getElementById('askNo').onclick=()=>done(false);
+  });
+}
+function showAlert(id,msg,ok){ const el=document.getElementById(id); if(!el) return; el.textContent=msg; el.className='alert '+(ok?'ok':'err'); el.scrollIntoView({block:'nearest'}); }
+function clearAlert(id){ const el=document.getElementById(id); if(el) el.className='alert'; }
+
+// Cómo se baja todo de cada plataforma (según sus guías de ayuda; los menús pueden cambiar).
+const PLAT={
+  booksy:{nombre:'Booksy',nota:'Clientes',pasos:[
+    'Entra a Booksy Biz desde una computadora o tableta: en el celular no sale la opción de exportar.',
+    'Ve a Clientes, toca Más opciones y escoge Exportar. Si te da dos archivos, súbelos los dos.',
+    'Booksy no deja bajar las citas, las ventas ni tu menú. Pídeselos por escrito a su soporte (el "?" de tu cuenta) y súbelos cuando lleguen. Tu menú lo puedes pasar con una foto de tu lista de precios, aquí abajo.']},
+  fresha:{nombre:'Fresha',nota:'Todo',pasos:[
+    'Entra a Fresha desde una computadora.',
+    'Tus clientes: abre la lista de Clientes, toca Opciones y escoge Exportar como CSV.',
+    'Tus servicios: en el Catálogo de servicios, toca Opciones y Descargar CSV.',
+    'Tus citas y tus ventas: en Ventas (o en Reportes) abre la lista de citas y la de ventas, escoge "Todo el tiempo" o el rango que quieras, con las fechas que vienen incluidas, y exporta en CSV o Excel.']},
+  goldie:{nombre:'GOLDIE',nota:'Todo en un paquete',pasos:[
+    'En la app de GOLDIE abre el menú, entra a Mi cuenta (My Account) y toca los tres puntos.',
+    'Escoge Exportar datos (Export Data). Te llega un email con un enlace que dura 7 días.',
+    'Baja el archivo y súbelo aquí tal como llegó. Si es un .zip, súbelo así: lo abro aquí mismo.']},
+  square:{nombre:'Square',nota:'Todo',pasos:[
+    'Entra a tu panel de Square (Dashboard) desde una computadora.',
+    'Tus clientes: ve a Clientes, toca Importar / Exportar y Exportar clientes.',
+    'Tus citas: en Citas entra a Configuración, Historial y toca Exportar. Las citas que se repiten no salen en ese archivo; esas ponlas en tu agenda de Bukéame.',
+    'Tus ventas: en Transacciones exporta el rango que quieras. Tus servicios: en la Biblioteca de artículos, exporta tus servicios.']},
+  vagaro:{nombre:'Vagaro',nota:'Clientes y citas',pasos:[
+    'Entra a Vagaro como dueño de la cuenta: solo el dueño puede exportar los clientes.',
+    'Tus clientes: ve a Reportes, Clientes, Filtros avanzados, corre el reporte y expórtalo en Excel.',
+    'Tus citas: en Reportes, Citas (Appointment Summary), escoge todos los clientes y unas fechas que incluyan las que vienen, y exporta. Si no te deja, pídeselas a su soporte por el chat.']},
+  otra:{nombre:'Otra plataforma',nota:'Setmore, Acuity, StyleSeat…',pasos:[
+    'Busca en tu plataforma la opción de Exportar. Casi siempre está en Clientes o en Reportes. Bájalo en CSV o Excel, no en PDF.',
+    'Si no la encuentras, pídele a su soporte un archivo con tus clientes y tus citas. Es tu información y te la tienen que dar.']},
+  ninguna:{nombre:'No usaba ninguna',nota:'Libreta, celular o WhatsApp',pasos:[
+    'Si tus clientes están en tu celular, toca "Escoger de mis contactos" (en Android) o sube el archivo de contactos (.vcf) que te da tu teléfono o iCloud. Antes de pasarlos escoges cuáles son clientes.',
+    'Si los tienes en una libreta o en Excel, pásalos a una hoja con el nombre y el teléfono de cada uno y súbela.',
+    'Tus servicios pásalos con una foto de tu lista de precios.']},
+};
+
+let S={ini:null, plataforma:null, pendientes:[], R:null, resultado:null, abiertos:new Set()};
+
+async function load(){
+  const r=await api('GET','/mudanza');
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='block';
+  if(!r.ok){ document.getElementById('content').innerHTML='<div class="card"><p class="lead">'+esc((r.data&&r.data.error)||'No pudimos cargar la mudanza. Intenta de nuevo en un rato.')+'</p></div>'; return; }
+  S.ini=r.data;
+  const borrador=S.ini.mudanzas.find(m=>m.status==='draft');
+  render();
+  if(borrador && !S.R){
+    const b=await api('GET','/mudanza/'+borrador.id);
+    if(b.ok){ S.R=b.data; S.plataforma=b.data.plataforma; render(); }
+  }
+}
+
+function render(){
+  const c=document.getElementById('content');
+  if(S.resultado){ c.innerHTML=htmlResultado(); bindResultado(); return; }
+  c.innerHTML=htmlHistorial()+htmlPlataformas()+(S.plataforma?htmlSubir():'')+(S.R?htmlResumen():'');
+  bindPlataformas(); if(S.plataforma) bindSubir(); if(S.R) bindResumen(); bindHistorial();
+}
+
+// ---------- Mudanzas anteriores ----------
+function totalesTxt(t){
+  if(!t) return '';
+  const p=[];
+  if(t.clientes_nuevos) p.push(pl(t.clientes_nuevos,'cliente','clientes'));
+  if(t.servicios) p.push(pl(t.servicios,'servicio','servicios'));
+  if(t.citas) p.push(pl(t.citas,'cita','citas'));
+  if(t.historial) p.push(pl(t.historial,'visita de antes','visitas de antes'));
+  if(t.ventas) p.push(pl(t.ventas,'venta','ventas'));
+  if(t.tarjetas) p.push(pl(t.tarjetas,'tarjeta de regalo','tarjetas de regalo'));
+  if(t.paquetes) p.push(pl(t.paquetes,'paquete','paquetes'));
+  if(t.lealtad) p.push(pl(t.lealtad,'cliente con puntos','clientes con puntos'));
+  if(!p.length) return 'Nada nuevo.';
+  return (p.length>1?p.slice(0,-1).join(', ')+' y '+p[p.length-1]:p[0])+'.';
+}
+function htmlHistorial(){
+  const hechas=(S.ini.mudanzas||[]).filter(m=>m.status!=='draft');
+  if(!hechas.length) return '';
+  return '<div class="seclabel">Tus mudanzas</div><div class="card"><div class="alert" id="histAlert"></div>'+hechas.map(m=>{
+    const t=(m.summary||{}).totales;
+    const q=(m.summary||{}).se_quedaron;
+    return '<div class="hist"><p><b>Desde '+esc(m.plataforma_nombre)+'</b>, el '+esc(fecha(m.done_at||m.created_at))+'. '+esc(totalesTxt(t))+
+      (m.status==='undone'?'<small>La deshiciste el '+esc(fecha(m.undone_at))+'.'+(q&&Object.values(q).some(Boolean)?' Se quedó lo que ya tenía movimiento.':'')+'</small>':'')+
+      (m.puede_deshacer?'<small>La puedes deshacer hasta el '+esc(fecha(new Date(new Date(m.done_at).getTime()+S.ini.deshacer_dias*864e5)))+'.</small>':'')+'</p>'+
+      (m.puede_deshacer?'<button type="button" class="btn-ghost danger" data-deshacer="'+esc(m.id)+'">Deshacer</button>':'')+'</div>';
+  }).join('')+'</div>';
+}
+function bindHistorial(){
+  document.querySelectorAll('[data-deshacer]').forEach(b=>b.onclick=()=>deshacer(b.getAttribute('data-deshacer'),'histAlert'));
+}
+async function deshacer(id,alertId){
+  if(!(await askConfirm('¿Deshacer esta mudanza? Se borra lo que pasó y nadie ha usado. Lo que ya tiene movimiento (una cita cobrada, una tarjeta gastada, un cliente que reservó) se queda.','Sí, deshacerla'))) return;
+  const r=await api('POST','/mudanza/'+id+'/deshacer');
+  if(!r.ok){ showAlert(alertId,r.data.error||'No se pudo deshacer. Intenta otra vez.'); return; }
+  const q=r.data.se_quedaron||{};
+  const quedan=[];
+  if(q.clientes) quedan.push(pl(q.clientes,'cliente','clientes'));
+  if(q.citas) quedan.push(pl(q.citas,'cita','citas'));
+  if(q.tarjetas) quedan.push(pl(q.tarjetas,'tarjeta','tarjetas'));
+  if(q.paquetes) quedan.push(pl(q.paquetes,'paquete','paquetes'));
+  if(q.servicios) quedan.push(pl(q.servicios,'servicio','servicios'));
+  if(q.lealtad) quedan.push(pl(q.lealtad,'cliente con puntos','clientes con puntos'));
+  S.resultado=null;
+  const ini=await api('GET','/mudanza'); if(ini.ok) S.ini=ini.data;
+  render();
+  showAlert('histAlert','Listo, la deshiciste.'+(quedan.length?' Se quedaron '+quedan.join(', ')+' porque ya tienen movimiento en Bukéame.':''),true);
+}
+
+// ---------- 1. ¿De dónde vienes? ----------
+function htmlPlataformas(){
+  return '<div class="seclabel">¿De dónde vienes?</div><div class="card"><div class="plats">'+
+    Object.entries(PLAT).map(([k,p])=>'<button type="button" class="plat'+(S.plataforma===k?' on':'')+'" data-plat="'+k+'" aria-pressed="'+(S.plataforma===k)+'">'+esc(p.nombre)+'<small>'+esc(p.nota)+'</small></button>').join('')+
+    '</div></div>';
+}
+function bindPlataformas(){
+  document.querySelectorAll('[data-plat]').forEach(b=>b.onclick=()=>{
+    if(S.R && S.R.plataforma!==b.getAttribute('data-plat')){
+      askConfirm('Ya tienes una mudanza a medias desde '+S.R.plataforma_nombre+'. Si cambias de plataforma, empiezas otra. ¿Seguro?','Sí, empezar otra').then(ok=>{ if(ok){ S.R=null; S.pendientes=[]; S.plataforma=b.getAttribute('data-plat'); render(); } });
+      return;
+    }
+    S.plataforma=b.getAttribute('data-plat'); render();
+    const el=document.getElementById('subir'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+}
+
+// ---------- 2. Baja tus archivos y súbelos ----------
+function htmlSubir(){
+  const p=PLAT[S.plataforma];
+  const contactos='contacts' in navigator && 'select' in (navigator.contacts||{});
+  return '<div class="seclabel" id="subir">'+(S.plataforma==='ninguna'?'Junta lo que tienes':'Baja tus archivos de '+esc(p.nombre))+'</div>'+
+    '<div class="card">'+
+      '<div class="pasos">'+p.pasos.map(x=>'<div class="paso"><span>'+esc(x)+'</span></div>').join('')+'</div>'+
+      '<div class="alert" id="subirAlert"></div>'+
+      '<div class="drop" id="drop"><p>Arrastra aquí tus archivos o escógelos. Sirven <b>CSV, Excel, ZIP y contactos (.vcf)</b>. El archivo se lee en tu equipo: a Bukéame solo le llegan las filas.</p>'+
+        '<button type="button" class="btn" id="btnFiles">Escoger archivos</button></div>'+
+      '<div class="tools">'+
+        (S.ini.ia?'<button type="button" class="btn-ghost" id="btnFoto">Foto de mi lista de precios</button>':'')+
+        (contactos?'<button type="button" class="btn-ghost" id="btnContactos">Escoger de mis contactos</button>':'')+
+      '</div>'+
+      '<div class="pend" id="pend">'+htmlPendientes()+'</div>'+
+      (S.pendientes.length?'<div class="tools"><button type="button" class="btn" id="btnAnalizar">'+(S.R?'Añadir a la mudanza':'Ver qué se pasa')+'</button></div>':'')+
+    '</div>';
+}
+function htmlPendientes(){
+  if(!S.pendientes.length) return '';
+  return S.pendientes.map((f,i)=>'<div class="f"><span>'+esc(f.nombre)+'</span><em>'+pl(Math.max(0,f.filas.length-1),'fila','filas')+'</em><button type="button" class="rowx" data-quitar-p="'+i+'" aria-label="Quitar '+esc(f.nombre)+'">×</button></div>').join('');
+}
+function bindSubir(){
+  const pick=document.getElementById('pickFiles');
+  document.getElementById('btnFiles').onclick=()=>pick.click();
+  pick.onchange=()=>{ leerArchivos([...pick.files]); pick.value=''; };
+  const drop=document.getElementById('drop');
+  drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave=()=>drop.classList.remove('over');
+  drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('over'); leerArchivos([...e.dataTransfer.files]); };
+  const bf=document.getElementById('btnFoto');
+  if(bf){ const pf=document.getElementById('pickFoto'); bf.onclick=()=>pf.click(); pf.onchange=()=>{ if(pf.files[0]) leerFoto(pf.files[0]); pf.value=''; }; }
+  const bc=document.getElementById('btnContactos'); if(bc) bc.onclick=escogerContactos;
+  document.querySelectorAll('[data-quitar-p]').forEach(b=>b.onclick=()=>{ S.pendientes.splice(+b.getAttribute('data-quitar-p'),1); render(); });
+  const ba=document.getElementById('btnAnalizar'); if(ba) ba.onclick=analizar;
+}
+
+// ---------- Leer archivos en el equipo ----------
+const MAX_FILAS=20000;
+let xlsxListo=null;
+function cargarXLSX(){
+  if(window.XLSX) return Promise.resolve();
+  if(xlsxListo) return xlsxListo;
+  xlsxListo=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.integrity='sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT';
+    s.crossOrigin='anonymous';
+    s.onload=()=>res(); s.onerror=()=>{ xlsxListo=null; rej(new Error('No pude abrir el lector de Excel. Revisa tu internet, o guarda el archivo como CSV y súbelo otra vez.')); };
+    document.head.appendChild(s);
+  });
+  return xlsxListo;
+}
+function texto(buf){
+  const u=new Uint8Array(buf);
+  if(u[0]===0xFF&&u[1]===0xFE) return new TextDecoder('utf-16le').decode(u.subarray(2));
+  try{ return new TextDecoder('utf-8',{fatal:true}).decode(u).replace(/^﻿/,''); }
+  catch(e){ return new TextDecoder('windows-1252').decode(u); }   // Excel viejo guarda los CSV así
+}
+// CSV con comillas; el separador se adivina (coma, punto y coma, tab o barra).
+function leerCSV(t){
+  const linea1=(t.split(/\r?\n/).find(l=>l.trim())||'');
+  let sep=',',max=-1;
+  for(const c of [',',';','\t','|']){ let n=0,dentro=false; for(const ch of linea1){ if(ch==='"') dentro=!dentro; else if(ch===c&&!dentro) n++; } if(n>max){max=n;sep=c;} }
+  const filas=[]; let fila=[],campo='',q=false;
+  for(let i=0;i<t.length;i++){
+    const ch=t[i];
+    if(q){ if(ch==='"'){ if(t[i+1]==='"'){campo+='"';i++;} else q=false; } else campo+=ch; continue; }
+    if(ch==='"'&&campo==='') q=true;
+    else if(ch===sep){ fila.push(campo); campo=''; }
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&t[i+1]==='\n') i++; fila.push(campo); filas.push(fila); fila=[]; campo=''; if(filas.length>MAX_FILAS+20) break; }
+    else campo+=ch;
+  }
+  if(campo!==''||fila.length){ fila.push(campo); filas.push(fila); }
+  return filas.filter(f=>f.some(c=>String(c).trim()));
+}
+// Contactos (.vcf): nombre, teléfono, email, cumpleaños y nota de cada tarjeta.
+function leerVCF(t){
+  const lineas=t.replace(/\r\n/g,'\n').replace(/\n[ \t]/g,'').replace(/=\n/g,'').split('\n');
+  const out=[]; let c=null;
+  const qp=s=>{ try{ return decodeURIComponent(s.replace(/=([0-9A-F]{2})/gi,'%$1')); }catch(e){ return s; } };
+  const val=(l)=>{ const i=l.indexOf(':'); let v=l.slice(i+1); if(/ENCODING=QUOTED-PRINTABLE/i.test(l.slice(0,i))) v=qp(v); return v.replace(/\\n/gi,' ').replace(/\\([,;\\])/g,'$1').trim(); };
+  for(const l of lineas){
+    const k=l.split(/[;:]/)[0].toUpperCase().replace(/^ITEM\d+\./,'');
+    if(k==='BEGIN'){ c={fn:'',n:'',tel:'',cel:'',email:'',bday:'',note:''}; continue; }
+    if(!c) continue;
+    if(k==='END'){ out.push(c); c=null; continue; }
+    if(k==='FN') c.fn=val(l);
+    else if(k==='N'&&!c.n){ const p=val(l).split(';'); c.n=[p[1],p[2],p[0]].filter(Boolean).join(' ').trim(); }
+    else if(k==='TEL'){ const v=val(l); if(/CELL|MOBILE|IPHONE/i.test(l)&&!c.cel) c.cel=v; else if(!c.tel) c.tel=v; }
+    else if(k==='EMAIL'&&!c.email) c.email=val(l);
+    else if(k==='BDAY'&&!c.bday) c.bday=val(l);
+    else if(k==='NOTE'&&!c.note) c.note=val(l).slice(0,300);
+  }
+  return out.map(x=>({nombre:x.fn||x.n,tel:x.cel||x.tel,email:x.email,bday:x.bday,nota:x.note})).filter(x=>x.nombre||x.tel);
+}
+async function hojasDe(nombre,buf){
+  await cargarXLSX();
+  const wb=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true,dense:true});
+  const out=[];
+  for(const h of wb.SheetNames){
+    const filas=XLSX.utils.sheet_to_json(wb.Sheets[h],{header:1,raw:false,dateNF:'yyyy-mm-dd hh:mm',defval:'',blankrows:false})
+      .map(f=>f.map(c=>c==null?'':String(c))).filter(f=>f.some(c=>c.trim()));
+    if(filas.length>=2) out.push({nombre:wb.SheetNames.length>1?nombre+' ('+h+')':nombre,filas});
+  }
+  return out;
+}
+async function abrir(nombre,buf){
+  const ext=(nombre.split('.').pop()||'').toLowerCase();
+  if(ext==='csv'||ext==='txt'||ext==='tsv') return [{nombre,filas:leerCSV(texto(buf))}];
+  if(ext==='vcf') return [{nombre,vcf:leerVCF(texto(buf))}];
+  if(ext==='xlsx'||ext==='xls'||ext==='ods') return hojasDe(nombre,buf);
+  if(ext==='zip'){
+    await cargarXLSX();
+    const z=XLSX.CFB.read(new Uint8Array(buf),{type:'array'});
+    const out=[];
+    for(let i=0;i<z.FileIndex.length;i++){
+      const f=z.FileIndex[i], ruta=z.FullPaths[i]||f.name;
+      if(f.type!==2||!f.content||!f.content.length||/__MACOSX|\/\./.test(ruta)) continue;
+      const n=ruta.split('/').pop();
+      if(/\.(csv|txt|tsv|xlsx|xls|ods|vcf)$/i.test(n)) out.push(...await abrir(n,f.content.buffer.slice(f.content.byteOffset,f.content.byteOffset+f.content.length)));
+    }
+    if(!out.length) throw new Error(nombre+': el .zip no trae archivos CSV o Excel.');
+    return out;
+  }
+  if(ext==='pdf') throw new Error(nombre+': los PDF no se pueden leer. En tu plataforma escoge exportar en CSV o Excel.');
+  throw new Error(nombre+': ese tipo de archivo no lo puedo leer. Sube CSV, Excel, ZIP o .vcf.');
+}
+async function leerArchivos(lista){
+  clearAlert('subirAlert');
+  const errores=[];
+  const btn=document.getElementById('btnFiles'); if(btn){ btn.disabled=true; btn.textContent='Leyendo…'; }
+  for(const file of lista){
+    try{
+      if(file.size>60*1024*1024) throw new Error(file.name+' pesa más de 60 MB. Bájalo por partes (por año).');
+      const hojas=await abrir(file.name,await file.arrayBuffer());
+      for(const h of hojas){
+        if(h.vcf){ await revisarContactos(h.vcf,h.nombre); continue; }
+        if(h.filas.length>MAX_FILAS+15) throw new Error(h.nombre+' tiene más de 20,000 filas. Bájalo por partes (por ejemplo, por año) y súbelos juntos.');
+        if(h.filas.length<2) { errores.push(h.nombre+' está vacío.'); continue; }
+        S.pendientes.push(h);
+      }
+    }catch(e){ errores.push(e.message||(file.name+': no se pudo leer.')); }
+  }
+  render();
+  if(errores.length) showAlert('subirAlert',errores.join(' '));
+}
+
+// Contactos: el negocio escoge cuáles son clientes antes de pasarlos.
+function revisarContactos(lista,nombre){
+  return new Promise(res=>{
+    const conTel=lista.filter(c=>c.tel);
+    const sinTel=lista.length-conTel.length;
+    const marcado=conTel.map(()=>true);
+    const m=document.getElementById('contModal'), cont=document.getElementById('contLista'), buscar=document.getElementById('contBuscar');
+    const cuenta=()=>{ document.getElementById('contCuenta').textContent=pl(marcado.filter(Boolean).length,'marcado','marcados')+(sinTel?' ('+pl(sinTel,'contacto sin teléfono no se muestra','contactos sin teléfono no se muestran')+')':''); };
+    const pintar=()=>{
+      const t=buscar.value.trim().toLowerCase();
+      cont.innerHTML=conTel.map((c,i)=>(!t||(c.nombre||'').toLowerCase().includes(t)||(c.tel||'').replace(/\D/g,'').includes(t.replace(/\D/g,'')||'§'))?
+        '<label class="crow"><input type="checkbox" data-c="'+i+'"'+(marcado[i]?' checked':'')+'><span>'+esc(c.nombre||'Sin nombre')+'<small>'+esc(c.tel)+'</small></span></label>':'').join('')||'<p class="muted" style="font-size:13px">Nadie con ese nombre.</p>';
+      cont.querySelectorAll('[data-c]').forEach(x=>x.onchange=()=>{ marcado[+x.getAttribute('data-c')]=x.checked; cuenta(); });
+    };
+    buscar.value=''; pintar(); cuenta();
+    buscar.oninput=pintar;
+    document.getElementById('contTodos').onclick=()=>{ marcado.fill(true); pintar(); cuenta(); };
+    document.getElementById('contNinguno').onclick=()=>{ marcado.fill(false); pintar(); cuenta(); };
+    m.classList.add('on');
+    const cerrar=(usar)=>{
+      m.classList.remove('on');
+      if(usar){
+        const filas=[['Nombre','Teléfono','Email','Cumpleaños','Notas']].concat(conTel.filter((c,i)=>marcado[i]).map(c=>[c.nombre||'',c.tel||'',c.email||'',c.bday||'',c.nota||'']));
+        if(filas.length>1) S.pendientes.push({nombre:nombre||'Contactos del celular',filas,tipo:'clientes'});
+      }
+      render(); res();
+    };
+    document.getElementById('contSi').onclick=()=>cerrar(true);
+    document.getElementById('contNo').onclick=()=>cerrar(false);
+  });
+}
+async function escogerContactos(){
+  try{
+    const lista=await navigator.contacts.select(['name','tel','email'],{multiple:true});
+    if(!lista||!lista.length) return;
+    const filas=[['Nombre','Teléfono','Email']].concat(lista.map(c=>[(c.name||[])[0]||'',(c.tel||[])[0]||'',(c.email||[])[0]||'']));
+    S.pendientes.push({nombre:'Contactos del celular',filas,tipo:'clientes'});
+    render();
+  }catch(e){ showAlert('subirAlert','No pude abrir tus contactos. Sube el archivo .vcf de tus contactos en su lugar.'); }
+}
+
+// Foto de la lista de precios: se achica aquí, Claude la lee y el negocio revisa lo que leyó.
+async function leerFoto(file){
+  clearAlert('subirAlert');
+  const bf=document.getElementById('btnFoto'); if(bf){ bf.disabled=true; bf.textContent='Leyendo la foto…'; }
+  try{
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('Esa foto no se pudo abrir. Prueba con otra (JPG o PNG).')); i.src=URL.createObjectURL(file); });
+    const k=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));
+    const cv=document.createElement('canvas'); cv.width=Math.round(img.naturalWidth*k); cv.height=Math.round(img.naturalHeight*k);
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+    URL.revokeObjectURL(img.src);
+    const r=await api('POST','/mudanza/foto',{imagen:cv.toDataURL('image/jpeg',0.85)});
+    if(!r.ok) throw new Error(r.data.error||'No pude leer la foto. Intenta otra vez.');
+    revisarFoto(r.data.servicios);
+  }catch(e){ showAlert('subirAlert',e.message); }
+  finally{ render(); }
+}
+function revisarFoto(servicios){
+  const lista=servicios.map(s=>({...s}));
+  const m=document.getElementById('fotoModal'), cont=document.getElementById('fotoLista');
+  const pintar=()=>{
+    cont.innerHTML=lista.map((s,i)=>'<div class="srow"><input type="text" data-k="nombre" data-i="'+i+'" value="'+esc(s.nombre)+'" aria-label="Servicio"><input type="text" data-k="precio" data-i="'+i+'" value="'+esc(s.precio)+'" placeholder="$" aria-label="Precio"><input type="text" data-k="minutos" data-i="'+i+'" value="'+esc(s.minutos)+'" placeholder="min" aria-label="Duración"><button type="button" class="rowx" data-x="'+i+'" aria-label="Quitar">×</button></div>').join('');
+    cont.querySelectorAll('input').forEach(x=>x.oninput=()=>{ lista[+x.getAttribute('data-i')][x.getAttribute('data-k')]=x.value; });
+    cont.querySelectorAll('[data-x]').forEach(x=>x.onclick=()=>{ lista.splice(+x.getAttribute('data-x'),1); pintar(); });
+  };
+  pintar(); m.classList.add('on');
+  document.getElementById('fotoMas').onclick=()=>{ lista.push({nombre:'',precio:'',minutos:''}); pintar(); };
+  document.getElementById('fotoNo').onclick=()=>m.classList.remove('on');
+  document.getElementById('fotoSi').onclick=()=>{
+    m.classList.remove('on');
+    const filas=[['Servicio','Precio','Duración']].concat(lista.filter(s=>s.nombre.trim()).map(s=>[s.nombre.trim(),s.precio,s.minutos]));
+    if(filas.length>1) S.pendientes.push({nombre:'Foto de la lista de precios',filas,tipo:'servicios'});
+    render();
+  };
+}
+
+// ---------- 3. El resumen ----------
+async function analizar(){
+  const b=document.getElementById('btnAnalizar'); b.disabled=true; b.textContent='Revisando tus archivos…';
+  clearAlert('subirAlert');
+  const r=await apiGrande('POST','/mudanza/analizar',{id:S.R?S.R.id:undefined,plataforma:S.plataforma,archivos:S.pendientes.map(f=>({nombre:f.nombre,filas:f.filas,tipo:f.tipo}))});
+  if(!r.ok){
+    if(r.status===404&&S.R){ S.R=null; }
+    b.disabled=false; b.textContent='Ver qué se pasa';
+    showAlert('subirAlert',r.data.error||'No pude revisar los archivos. Intenta otra vez.'); return;
+  }
+  S.pendientes=[]; S.R=r.data; render();
+  const el=document.getElementById('resumen'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function frase(R){
+  const t=R.totales, p=[];
+  if(t.clientes_nuevos||t.clientes_completados) p.push('<b>'+num(t.clientes_nuevos)+'</b> '+(t.clientes_nuevos===1?'cliente nuevo':'clientes nuevos')+(t.clientes_completados?' (y a <b>'+num(t.clientes_completados)+'</b> que ya estaban les completo lo que les faltaba)':''));
+  if(t.servicios_nuevos) p.push('<b>'+num(t.servicios_nuevos)+'</b> '+(t.servicios_nuevos===1?'servicio':'servicios'));
+  if(t.citas_futuras) p.push('<b>'+num(t.citas_futuras)+'</b> '+(t.citas_futuras===1?'cita que viene':'citas que vienen'));
+  if(t.historial) p.push('<b>'+num(t.historial)+'</b> '+(t.historial===1?'visita de antes':'visitas de antes')+' al historial de tus clientes');
+  if(t.ventas) p.push('<b>'+num(t.ventas)+'</b> '+(t.ventas===1?'venta':'ventas')+' por <b>'+dinero(t.ventas_cents)+'</b>');
+  if(t.tarjetas) p.push('<b>'+num(t.tarjetas)+'</b> '+(t.tarjetas===1?'tarjeta de regalo':'tarjetas de regalo')+' con <b>'+dinero(t.tarjetas_cents)+'</b> de saldo');
+  if(t.paquetes) p.push('<b>'+num(t.paquetes)+'</b> '+(t.paquetes===1?'paquete prepagado':'paquetes prepagados'));
+  if(t.lealtad) p.push('los puntos de <b>'+num(t.lealtad)+'</b> '+(t.lealtad===1?'cliente':'clientes'));
+  if(!p.length) return 'Con lo que subiste no pasa nada todavía. Revisa los archivos de abajo.';
+  return 'Vas a pasar '+(p.length>1?p.slice(0,-1).join(', ')+' y '+p[p.length-1]:p[0])+'.';
+}
+function cuentaArchivo(a){
+  if(a.quitado) return 'Lo quitaste de la mudanza.';
+  const s=[];
+  if(a.tipo==='citas'){
+    const p=[];
+    if(a.futuras) p.push('<b>'+pl(a.futuras,'cita que viene','citas que vienen')+'</b> a tu agenda');
+    if(a.pasadas) p.push('<b>'+pl(a.pasadas,'visita de antes','visitas de antes')+'</b> al historial');
+    s.push(p.length ? (a.futuras+a.pasadas===1?'Pasa ':'Pasan ')+p.join(' y ')+'.' : 'No pasa ninguna cita.');
+    if(a.canceladas) s.push(pl(a.canceladas,'cita cancelada no se pasa','citas canceladas no se pasan')+'.');
+  } else {
+    s.push((a.pasan===1?'Pasa':'Pasan')+' <b>'+num(a.pasan)+'</b> de '+num(a.filas)+(a.filas===1?' fila.':' filas.'));
+    if(a.ya) s.push(pl(a.ya,'ya estaba en Bukéame y se queda como está','ya estaban en Bukéame y se quedan como están')+'.');
+  }
+  if(a.repetidos) s.push(pl(a.repetidos,'estaba repetida y se juntó','estaban repetidas y se juntaron')+'.');
+  if(a.fuera_n) s.push(pl(a.fuera_n,'se queda fuera','se quedan fuera')+'.');
+  return s.join(' ');
+}
+function htmlArchivo(a){
+  const k='a'+a.i;
+  return '<div class="card" style="'+(a.quitado?'opacity:.6':'')+'">'+
+    '<div class="fhead"><div class="left"><h3>'+esc(a.nombre)+'</h3><small>'+(a.porIA?'Las columnas las reconocí con ayuda de IA (sin ver tus datos): revisa que estén bien.':'Es un archivo de')+'</small></div>'+
+      (a.quitado?'<button type="button" class="btn-ghost" data-volver="'+a.i+'">Volver a ponerlo</button>':
+      '<select data-tipo="'+a.i+'" aria-label="Qué trae este archivo">'+S.R.tipos.map(t=>'<option value="'+t.k+'"'+(t.k===a.tipo?' selected':'')+'>'+esc(t.nombre)+'</option>').join('')+'</select>'+
+      '<button type="button" class="btn-ghost" data-quitar="'+a.i+'">Quitar</button>')+'</div>'+
+    '<p class="cuenta">'+cuentaArchivo(a)+'</p>'+
+    (a.quitado?'':
+      (a.faltan.length?'<div class="warnbox">No encuentro la columna de '+esc(a.faltan.join(' ni la de '))+'. Escógela abajo en "Columnas" o cambia qué trae este archivo.</div>':'')+
+      a.avisos.map(x=>'<div class="warnbox">'+esc(x)+'</div>').join('')+
+      (a.fechas_dudosas?'<div class="opt"><span>Las fechas de este archivo vienen</span><select data-orden="'+a.i+'"><option value="mdy"'+(a.orden==='mdy'?' selected':'')+'>mes/día (05/03 = 3 de mayo)</option><option value="dmy"'+(a.orden==='dmy'?' selected':'')+'>día/mes (05/03 = 5 de marzo)</option></select></div>':'')+
+      (a.muestra.filas.length?'<div class="scroll"><table class="tbl"><thead><tr>'+a.muestra.cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+
+        a.muestra.filas.map(f=>'<tr>'+f.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>':'')+
+      '<details data-k="'+k+'c"'+(S.abiertos.has(k+'c')?' open':'')+'><summary>Columnas</summary><div class="map">'+
+        a.campos.map(c=>'<label class="'+(c.requerido?'req':'')+'" for="m'+a.i+c.k+'">'+esc(c.e)+'</label><select id="m'+a.i+c.k+'" data-map="'+a.i+'" data-campo="'+c.k+'"><option value="">No la tiene</option>'+
+          a.encabezados.map(h=>'<option value="'+esc(h)+'"'+(a.mapa[c.k]===h?' selected':'')+'>'+esc(h)+'</option>').join('')+'</select>').join('')+
+      '</div></details>'+
+      (a.fuera_n?'<details data-k="'+k+'f"'+(S.abiertos.has(k+'f')?' open':'')+'><summary>Lo que se queda fuera ('+num(a.fuera_n)+')</summary><div>'+
+        a.fuera.map(x=>'<div class="fuera"><b>Fila '+num(x.fila)+'</b> '+esc(x.motivo)+(x.texto?'. '+esc(x.texto):'')+'</div>').join('')+
+        (a.fuera_n>a.fuera.length?'<div class="fuera">Y '+num(a.fuera_n-a.fuera.length)+' más con los mismos motivos.</div>':'')+'</div></details>':''))+
+  '</div>';
+}
+function htmlResumen(){
+  const R=S.R, t=R.totales;
+  const hayCitas=t.citas_futuras+t.choques>0;
+  const lealtad=R.archivos.some(a=>!a.quitado&&a.tipo==='lealtad');
+  const paquetes=R.archivos.some(a=>!a.quitado&&a.tipo==='paquetes');
+  return '<div class="seclabel" id="resumen">Lo que se pasa</div>'+
+    '<div class="card"><p class="resumen">'+frase(R)+'</p>'+
+      (R.avisos||[]).map(x=>'<div class="warnbox">'+esc(x)+'</div>').join('')+
+      (t.choques?'<div class="warnbox">'+pl(t.choques,'cita choca','citas chocan')+' con otra que ya está en tu agenda (o no tiene profesional). Esa no se pasa; al final te digo cuál es para que la pongas tú.</div>':'')+
+      (t.fuera?'<p class="cuenta">'+pl(t.fuera,'fila se queda fuera','filas se quedan fuera')+'. En cada archivo te digo cuál y por qué.</p>':'')+
+    '</div>'+
+    R.archivos.map(htmlArchivo).join('')+
+    (hayCitas&&R.profesionales.length?'<div class="seclabel">Tu equipo</div><div class="card"><p class="lead">En tus citas aparecen estos nombres. Escoge a quién le toca cada uno en Bukéame. Si te falta alguien, añádelo en Equipo y vuelve aquí.</p><div class="map">'+
+      R.profesionales.map((p,i)=>'<label for="st'+i+'">'+(p.nombre?esc(p.nombre):'<span class="muted">Sin nombre en el archivo</span>')+' <span class="muted mono" style="font-size:11.5px">'+pl(p.citas,'cita','citas')+'</span></label><select id="st'+i+'" data-staff="'+esc(p.nombre)+'">'+
+        R.equipo.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===p.staff_id?' selected':'')+'>'+esc(s.nombre)+'</option>').join('')+'</select>').join('')+'</div></div>':'')+
+    '<div class="seclabel">Antes de mudar</div><div class="card">'+
+      '<div class="alert" id="mudarAlert"></div>'+
+      (hayCitas?'<div class="opt"><label class="chk" style="padding:0;flex:1"><input type="checkbox" id="optRec"'+(R.opciones.recordatorios?' checked':'')+'><span>Mandarles los recordatorios de siempre a las citas que vienen. El primero les dice que ahora sus citas llegan por Bukéame.</span></label></div>':'')+
+      (lealtad?'<div class="opt"><span>¿Cuántos puntos de tu otra plataforma son una visita aquí? Tu premio llega a las '+num(R.lealtad_visitas||0)+' visitas.</span><input type="number" id="optLeal" min="1" max="1000" value="'+R.opciones.lealtad_cada+'" style="width:90px"></div>':'')+
+      (paquetes?'<div class="opt"><span>Los paquetes que no dicen cuándo vencen valen por</span><select id="optPaq">'+[1,3,6,12,24].map(m=>'<option value="'+m+'"'+(R.opciones.paquetes_meses===m?' selected':'')+'>'+m+(m===1?' mes':' meses')+'</option>').join('')+'</select></div>':'')+
+      (R.necesita_saldos?'<label class="chk"><input type="checkbox" id="optSaldos"><span>Revisé los saldos: las tarjetas de regalo, los paquetes y los puntos son lo que mis clientes tienen de verdad.</span></label>':'')+
+      '<p class="cuenta">Tus clientes no reciben nada al mudar. Los que lleguen así no quedan apuntados para tus avisos por WhatsApp: esos los tienen que aceptar ellos.</p>'+
+      '<div class="tools"><button type="button" class="btn" id="btnMudar">Mudar todo a Bukéame</button><button type="button" class="btn-ghost" id="btnMas">Subir otro archivo</button></div>'+
+    '</div>';
+}
+function bindResumen(){
+  document.querySelectorAll('details[data-k]').forEach(d=>d.ontoggle=()=>{ d.open?S.abiertos.add(d.getAttribute('data-k')):S.abiertos.delete(d.getAttribute('data-k')); });
+  document.querySelectorAll('[data-tipo]').forEach(s=>s.onchange=()=>ajustar({archivos:[{i:+s.getAttribute('data-tipo'),tipo:s.value}]}));
+  document.querySelectorAll('[data-orden]').forEach(s=>s.onchange=()=>ajustar({archivos:[{i:+s.getAttribute('data-orden'),orden:s.value}]}));
+  document.querySelectorAll('[data-quitar]').forEach(b=>b.onclick=()=>ajustar({archivos:[{i:+b.getAttribute('data-quitar'),quitar:true}]}));
+  document.querySelectorAll('[data-volver]').forEach(b=>b.onclick=()=>ajustar({archivos:[{i:+b.getAttribute('data-volver'),quitar:false}]}));
+  document.querySelectorAll('[data-map]').forEach(s=>s.onchange=()=>ajustar({archivos:[{i:+s.getAttribute('data-map'),mapa:{[s.getAttribute('data-campo')]:s.value||null}}]}));
+  document.querySelectorAll('[data-staff]').forEach(s=>s.onchange=()=>{
+    const m={}; document.querySelectorAll('[data-staff]').forEach(x=>m[x.getAttribute('data-staff')]=x.value);
+    ajustar({opciones:{staff_map:m}});
+  });
+  const rec=document.getElementById('optRec'); if(rec) rec.onchange=()=>ajustar({opciones:{recordatorios:rec.checked}},true);
+  const le=document.getElementById('optLeal'); if(le) le.onchange=()=>{ const v=parseInt(le.value,10); if(v>=1&&v<=1000) ajustar({opciones:{lealtad_cada:v}}); };
+  const pq=document.getElementById('optPaq'); if(pq) pq.onchange=()=>ajustar({opciones:{paquetes_meses:+pq.value}},true);
+  document.getElementById('btnMudar').onclick=mudar;
+  document.getElementById('btnMas').onclick=()=>{ const el=document.getElementById('subir'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); document.getElementById('pickFiles').click(); };
+}
+let ajustando=false;
+async function ajustar(cambios,quieto){
+  if(ajustando) return; ajustando=true;
+  const y=window.scrollY;
+  const r=await api('POST','/mudanza/'+S.R.id+'/ajustar',cambios);
+  ajustando=false;
+  if(!r.ok){
+    if(r.status===404){ S.R=null; render(); showAlert('subirAlert',r.data.error); return; }
+    showAlert('mudarAlert',r.data.error||'No se pudo cambiar. Intenta otra vez.'); return;
+  }
+  const saldos=document.getElementById('optSaldos'); const ok=saldos&&saldos.checked;
+  S.R=r.data;
+  if(!quieto){ render(); window.scrollTo(0,y); const s2=document.getElementById('optSaldos'); if(s2) s2.checked=ok; }
+}
+
+// ---------- 4. Mudar ----------
+async function mudar(){
+  clearAlert('mudarAlert');
+  const saldos=document.getElementById('optSaldos');
+  if(saldos&&!saldos.checked){ showAlert('mudarAlert','Marca que revisaste los saldos: son dinero o visitas que les debes a tus clientes.'); return; }
+  if(!S.R.totales.clientes_nuevos&&!S.R.totales.clientes_completados&&!S.R.totales.servicios_nuevos&&!S.R.totales.citas_futuras&&!S.R.totales.ventas&&!S.R.totales.tarjetas&&!S.R.totales.paquetes&&!S.R.totales.lealtad&&!S.R.totales.historial){
+    showAlert('mudarAlert','Todavía no hay nada que pasar. Revisa las columnas de tus archivos.'); return;
+  }
+  if(!(await askConfirm(frase(S.R).replace(/<[^>]+>/g,'')+' ¿Lo mudo ahora? Lo puedes deshacer durante 7 días.','Sí, mudar'))) return;
+  const b=document.getElementById('btnMudar'); b.disabled=true; b.textContent='Mudando… no cierres esta página';
+  const opciones={saldos_ok:!!(saldos&&saldos.checked)};
+  const rec=document.getElementById('optRec'); if(rec) opciones.recordatorios=rec.checked;
+  const r=await api('POST','/mudanza/'+S.R.id+'/mudar',{opciones});
+  if(!r.ok){
+    // Sin respuesta clara (se cortó la conexión o el servidor tardó): pudo haberse hecho. Se revisa antes de decir nada.
+    if(!r.data||!r.data.error||r.status===0||r.status>=500){
+      const ini=await api('GET','/mudanza');
+      const hecha=ini.ok&&ini.data.mudanzas.find(m=>m.id===S.R.id&&m.status==='done');
+      if(hecha){ try{ localStorage.setItem('bukeame_mudanza_hecha','1'); }catch(e){} S.ini=ini.data; S.resultado={id:hecha.id,...hecha.summary}; S.R=null; S.pendientes=[]; render(); window.scrollTo(0,0); return; }
+    }
+    b.disabled=false; b.textContent='Mudar todo a Bukéame'; showAlert('mudarAlert',(r.data&&r.data.error)||'No se pudo mudar y no se guardó nada. Intenta otra vez.'); return;
+  }
+  try{ localStorage.setItem('bukeame_mudanza_hecha','1'); }catch(e){}
+  S.resultado={id:S.R.id,...r.data.resumen}; S.R=null; S.pendientes=[];
+  render(); window.scrollTo(0,0);
+}
+function htmlResultado(){
+  const R=S.resultado, t=R.totales;
+  return '<div class="card"><h2>Listo, ya estás en Bukéame</h2><p class="resumen" style="margin-top:6px">Pasé '+esc(totalesTxt(t))+'</p>'+
+    (t.clientes_completados?'<p class="cuenta">A '+pl(t.clientes_completados,'cliente','clientes')+' que ya tenías les completé lo que les faltaba, sin cambiarles el nombre.</p>':'')+
+    (t.citas&&R.recordatorios?'<p class="cuenta">A las citas que vienen les llegan los recordatorios de siempre. El primero dice que ahora sus citas llegan por Bukéame.'+(t.sin_recordatorio?' '+pl(t.sin_recordatorio,'cita pasó','citas pasaron')+' sin recordatorio porque había más de 60 en un mismo día.':'')+'</p>':'')+
+    (t.repetidas?'<p class="cuenta">'+pl(t.repetidas,'venta o visita de antes ya estaba','ventas o visitas de antes ya estaban')+' de una mudanza anterior y no se repitió.</p>':'')+
+    (t.citas&&!R.recordatorios?'<p class="cuenta">A las citas que pasé no les llegan recordatorios, como escogiste.</p>':'')+
+    (R.choques.length?'<div class="warnbox">'+pl(R.choques.length,'cita no se pasó','citas no se pasaron')+' porque chocaban con otra de tu agenda o no tenían profesional. Ponlas tú:</div><div class="scroll"><table class="tbl"><thead><tr><th>Cuándo</th><th>Cliente</th><th>Por qué</th></tr></thead><tbody>'+
+      R.choques.map(c=>'<tr><td>'+esc(fechaHora(c.cuando))+'</td><td>'+esc(c.quien)+'</td><td>'+esc(c.motivo)+'</td></tr>').join('')+'</tbody></table></div>':'')+
+    (R.codigos_nuevos.length?'<div class="warnbox">'+pl(R.codigos_nuevos.length,'tarjeta de regalo tiene código nuevo','tarjetas de regalo tienen código nuevo')+' de Bukéame, más seguro que el de antes. Dile a cada cliente el suyo; el de antes queda guardado por si te lo enseñan.</div><div class="scroll"><table class="tbl"><thead><tr><th>Antes</th><th>Ahora</th><th>Para</th></tr></thead><tbody>'+
+      R.codigos_nuevos.map(c=>'<tr><td class="mono">'+esc(c.antes)+'</td><td class="mono">'+esc(c.ahora)+'</td><td>'+esc(c.para)+'</td></tr>').join('')+'</tbody></table></div><div class="tools"><button type="button" class="btn-ghost" id="btnCodigos">Bajar la lista de códigos</button></div>':'')+
+    '<div class="tools"><a class="btn" href="panel.html">Ir a mi panel</a><button type="button" class="btn-ghost" id="btnOtra">Mudar algo más</button><button type="button" class="btn-ghost danger" id="btnDeshacer">Deshacer la mudanza</button></div>'+
+    '<div class="alert" id="resAlert" style="margin-top:12px"></div>'+
+  '</div>';
+}
+function bindResultado(){
+  const R=S.resultado;
+  const bc=document.getElementById('btnCodigos');
+  if(bc) bc.onclick=()=>{
+    const celda=v=>{ let s=String(v==null?'':v); if(/^[=+\-@]/.test(s)) s="'"+s; return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+    const csv='﻿'+[['Código de antes','Código nuevo','Para']].concat(R.codigos_nuevos.map(c=>[c.antes,c.ahora,c.para])).map(f=>f.map(celda).join(',')).join('\r\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='bukeame-codigos-tarjetas.csv'; a.click();
+  };
+  document.getElementById('btnOtra').onclick=async()=>{ S.resultado=null; const r=await api('GET','/mudanza'); if(r.ok) S.ini=r.data; render(); };
+  document.getElementById('btnDeshacer').onclick=()=>deshacer(R.id,'resAlert');
+}
+
+load();
+</script>
+</body>
+</html>

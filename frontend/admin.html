@@ -186,6 +186,19 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       </div>
     </div>
 
+    <!-- MUDANZAS: quién se mudó desde otra plataforma (solo conteos, sin datos de clientes) -->
+    <div class="section">
+      <div class="seclabel">Mudanzas desde otras plataformas</div>
+      <div class="tablecard">
+        <div class="scrollx">
+          <table id="mudTable"><thead><tr>
+            <th>Negocio</th><th>Desde</th><th>Cuándo</th><th>Pasó</th><th>Estado</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div class="empty" id="mudEmpty" style="display:none">Nadie se ha mudado todavía.</div>
+      </div>
+    </div>
+
     <!-- SEGURIDAD / 2FA -->
     <div class="section">
       <div class="seclabel">Seguridad de tu cuenta</div>
@@ -418,6 +431,20 @@ function money(cents){
 }
 
 // ── Referidos ──────────────────────────────────────────────────────────────
+async function loadMudanzas(){
+  try{
+    const r = await fetch(API + '/admin/mudanzas', { headers:{ 'Authorization':'Bearer '+token } });
+    if(!r.ok) return;
+    const lista = (await r.json()).mudanzas || [];
+    if(!lista.length){ document.getElementById('mudTable').style.display = 'none'; document.getElementById('mudEmpty').style.display = 'block'; return; }
+    const pl = (n, a, b) => n + ' ' + (n === 1 ? a : b);
+    const pasó = t => { if(!t) return '—'; const p = []; if(t.clientes_nuevos) p.push(pl(t.clientes_nuevos,'cliente','clientes')); if(t.servicios) p.push(pl(t.servicios,'servicio','servicios')); if(t.citas) p.push(pl(t.citas,'cita','citas')); if(t.historial) p.push(pl(t.historial,'visita de antes','visitas de antes')); if(t.ventas) p.push(pl(t.ventas,'venta','ventas')); const saldos = (t.tarjetas||0)+(t.paquetes||0)+(t.lealtad||0); if(saldos) p.push(pl(saldos,'saldo','saldos')); return p.join(', ') || 'nada nuevo'; };
+    document.querySelector('#mudTable tbody').innerHTML = lista.map(m =>
+      '<tr><td>'+esc(m.negocio)+'</td><td>'+esc(m.plataforma_nombre)+'</td><td>'+esc(new Date(m.done_at||m.created_at).toLocaleDateString('es-PR',{timeZone:'America/Puerto_Rico',day:'numeric',month:'short',year:'numeric'}))+'</td>'+
+      '<td>'+esc(pasó(m.totales))+(m.totales && m.totales.fuera ? ' <span class="muted">('+m.totales.fuera+' filas fuera)</span>' : '')+'</td><td>'+(m.status==='undone'?'La deshizo':'Hecha')+'</td></tr>').join('');
+  }catch(e){}
+}
+
 async function loadReferrals(){
   try{
     const r = await fetch(API + '/admin/referrals', { headers:{ 'Authorization':'Bearer '+token } });
@@ -553,6 +580,7 @@ async function load(){
     render(data);
     loadReferrals();
     loadCategoryRequests();
+    loadMudanzas();
     load2fa();
   }catch(err){
     showError('Error de conexión. Verifica tu internet e intenta de nuevo.');

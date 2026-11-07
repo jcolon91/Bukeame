@@ -388,6 +388,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
       <a data-v="promos" class="navlink">Promociones</a>
       <a href="referidos.html" class="navlink">Referidos</a>
       <a data-v="marketing" class="navlink">Marketing</a>
+      <a href="mudanza.html" class="navlink">Mudanza</a>
       <a data-v="cuenta" class="navlink">Mi cuenta</a>
       <div class="planbox">
         <small>Tu plan</small>
@@ -408,6 +409,7 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
           </div>
         </div>
         <div id="notifPanel" style="display:none"></div>
+        <div id="mudBanner" class="card" style="display:none;margin-bottom:14px"></div>
         <div class="kpis" id="kpis"></div>
         <div class="agenda-bar">
           <div class="agview-tg" id="agViewTg">
@@ -654,6 +656,9 @@ document.addEventListener('DOMContentLoaded',function(){document.querySelectorAl
             <button class="btn btn-teal btn-sm" id="exportBtn" style="padding:10px 18px">Descargar CSV</button>
           </div>
         </div>
+
+        <!-- Ventas de antes de Bukéame (mudanza): aparte, porque ya se reportaron en la otra plataforma -->
+        <div id="acctAntes" style="display:none;margin-top:24px;padding-top:20px;border-top:1px solid var(--line)"></div>
       </section>
 
       <section class="view" id="view-ordenes">
@@ -1978,6 +1983,18 @@ document.getElementById('bellBtn').onclick = async function(){
   if(ep){ ep.onclick = enablePush; }
 };
 
+// Negocio nuevo (menos de 30 días): le ofrece la mudanza hasta que mude o diga que ahora no.
+function mudBanner(){
+  const el = document.getElementById('mudBanner');
+  let cerrado = false;
+  try { cerrado = !!(localStorage.getItem('bukeame_mudanza_hecha') || localStorage.getItem('bukeame_mudanza_cerrada')); } catch(e){}
+  if(cerrado || !BIZ || !BIZ.created_at || Date.now() - new Date(BIZ.created_at).getTime() > 30*864e5) return;
+  el.innerHTML = '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div style="flex:1;min-width:220px;font-size:13.5px;line-height:1.5"><b>¿Vienes de Booksy, Fresha, GOLDIE u otra plataforma?</b><br>Trae tus clientes, tus servicios y las citas que vienen. Antes de guardar nada ves el resumen.</div>'+
+    '<div style="display:flex;gap:8px"><a class="btn btn-teal btn-sm" href="mudanza.html">Mudarme</a><button class="btn btn-ghost btn-sm" id="mudBannerX" type="button">Ahora no</button></div></div>';
+  el.style.display = 'block';
+  document.getElementById('mudBannerX').onclick = function(){ try { localStorage.setItem('bukeame_mudanza_cerrada','1'); } catch(e){} el.style.display = 'none'; };
+}
+
 async function boot(){
   let r;
   try {
@@ -2003,6 +2020,7 @@ async function boot(){
   }
   // Tiene negocio → mostrar el panel
   BIZ = r.data.business;
+  try { mudBanner(); } catch(e){}
   document.getElementById('boot').style.display='none';
   document.getElementById('onboard').style.display='none';
   document.getElementById('app').style.display='block';
@@ -2872,7 +2890,7 @@ async function loadServices(){
   }
   const svcs = r.data.services || [];
   if(svcs.length === 0){
-    list.innerHTML = '<div class="empty">Aún no tienes servicios.<br>Toca "+ Nuevo" para añadir el primero.</div>';
+    list.innerHTML = '<div class="empty">Aún no tienes servicios.<br>Toca "+ Nuevo" para añadir el primero.<br><a href="mudanza.html" style="color:var(--teal-ink);font-weight:700">¿Los tienes en otra plataforma? Múdalos aquí.</a></div>';
     return;
   }
   _svcsCache = svcs;
@@ -3205,7 +3223,7 @@ function openMenu(){ var d=document.getElementById('mobDrawer'),b=document.getEl
 function closeMenu(){ var d=document.getElementById('mobDrawer'),b=document.getElementById('mobBackdrop'),h=document.getElementById('hambBtn'); d.classList.remove('open'); b.classList.remove('open'); if(h) h.setAttribute('aria-expanded','false'); }
 function buildMobnav(){
   const nav = document.getElementById('mobDrawer');
-  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#membresias.html','Membresías'],['#difusiones.html','Difusiones'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['#recepcionista.html','Recepcionista IA'],['#recupera.html','Recupera clientes'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['marketing','Marketing'],['#referidos.html','Referidos'],['cuenta','Mi cuenta']];
+  const items = [['agenda','Agenda'],['servicios','Servicios'],['equipo','Equipo'],['clientes','Clientes'],['lealtad','Lealtad'],['#membresias.html','Membresías'],['#difusiones.html','Difusiones'],['#productos.html','Tienda'],['#espera.html','Lista de espera'],['#recepcionista.html','Recepcionista IA'],['#recupera.html','Recupera clientes'],['ordenes','Órdenes'],['horario','Horario'],['contabilidad','Contabilidad'],['negocio','Mi negocio'],['pagos','Pagos'],['promos','Promociones'],['marketing','Marketing'],['#referidos.html','Referidos'],['#mudanza.html','Mudanza'],['cuenta','Mi cuenta']];
   // Móvil: drawer off-canvas (hamburguesa) en vez de una barra de pestañas.
   nav.innerHTML = items.map(function(it){
     return '<a data-v="'+it[0]+'">'+it[1]+'</a>';
@@ -3227,6 +3245,8 @@ const clientModal = document.getElementById('clientModal');
 let cliSearchT = null;
 const STATUS_ES = { pending_deposit:'Pendiente depósito', confirmed:'Confirmada', completed:'Completada', no_show:'No llegó', cancelled_client:'Cancelada', cancelled_business:'Cancelada' };
 function fmtDT(iso){ try{ return new Date(iso).toLocaleString('es-PR',{ timeZone:'America/Puerto_Rico', day:'numeric', month:'short', hour:'numeric', minute:'2-digit', hour12:true }); }catch(e){ return ''; } }
+function fmtD(iso){ try{ return new Date(iso).toLocaleDateString('es-PR',{ timeZone:'America/Puerto_Rico', day:'numeric', month:'short', year:'numeric' }); }catch(e){ return ''; } }
+const MUD_PLAT = { booksy:'Booksy', fresha:'Fresha', goldie:'GOLDIE', square:'Square', vagaro:'Vagaro', otra:'otra plataforma', ninguna:'su libreta o su celular' };
 
 async function loadClients(q){
   const list = document.getElementById('clientsList');
@@ -3239,7 +3259,7 @@ async function loadClients(q){
     return;
   }
   const cls = r.data.clients || [];
-  if(!cls.length){ list.innerHTML = '<div class="empty">'+(q?'Sin resultados para esa búsqueda.':'Aún no tienes clientes. Aparecen cuando reservan o los registras en una cita.')+'</div>'; return; }
+  if(!cls.length){ list.innerHTML = '<div class="empty">'+(q?'Sin resultados para esa búsqueda.':'Aún no tienes clientes. Aparecen cuando reservan o los registras en una cita.<br><a href="mudanza.html" style="color:var(--teal-ink);font-weight:700">¿Los tienes en otra plataforma o en tu celular? Múdalos aquí.</a>')+'</div>'; return; }
   list.innerHTML = cls.map(function(c){
     const tags = (c.is_blocked?'<span class="pill pill-red">Bloqueado</span>':'') + (c.no_show_count>0?('<span class="pill">'+c.no_show_count+' no-show</span>'):'');
     return '<div class="card cli-row" data-id="'+c.id+'">'+
@@ -3303,6 +3323,22 @@ function renderClient(d){
   h += d.upcoming.length ? d.upcoming.map(apptMini).join('') : '<div class="empty" style="padding:14px">Ninguna agendada.</div>';
   h += '<div class="seclabel" style="margin-top:16px">Citas previas</div>';
   h += d.past.length ? d.past.map(apptMini).join('') : '<div class="empty" style="padding:14px">Sin historial.</div>';
+  // Antes de Bukéame (llegó con la mudanza). Sus visitas de allá no son citas: no suben la lealtad.
+  if(d.antes){
+    const a = d.antes;
+    let t = 'Llegó desde '+(MUD_PLAT[a.source]||'otra plataforma')+'.';
+    if(a.visits!=null) t += ' Allá tuvo '+a.visits+(a.visits===1?' visita':' visitas')+(a.spent_cents!=null?' y gastó '+money(a.spent_cents):'')+'.';
+    else if(a.spent_cents!=null) t += ' Allá gastó '+money(a.spent_cents)+'.';
+    if(a.last_visit_at) t += ' Su última visita fue el '+fmtD(a.last_visit_at)+'.';
+    h += '<div class="seclabel" style="margin-top:16px">Antes de Bukéame</div>'+
+      '<div class="card" style="font-size:13px;line-height:1.5;margin-bottom:8px">'+esc(t)+'</div>';
+    h += (a.history||[]).map(function(v){
+      return '<div class="appt-mini"><div style="min-width:0"><b>'+esc(v.service_name||'Visita')+'</b>'+
+        '<div style="font-size:12px;color:var(--ink2)">'+fmtD(v.occurred_at)+(v.staff_name?(' · '+esc(v.staff_name)):'')+'</div></div>'+
+        '<div style="text-align:right;flex-shrink:0">'+(v.status==='no_show'?'<span class="pill">No llegó</span>':'')+
+        (v.price_cents!=null?'<div style="font-size:12px;color:var(--ink2);margin-top:3px">'+money(v.price_cents)+'</div>':'')+'</div></div>';
+    }).join('');
+  }
   if(d.gift_cards && d.gift_cards.length){
     const gs = {active:'Activa',partial:'Parcial',redeemed:'Usada',expired:'Vencida',void:'Anulada'};
     h += '<div class="seclabel" style="margin-top:16px">Tarjetas de regalo</div>';
@@ -4062,8 +4098,41 @@ document.querySelectorAll('.period-btn').forEach(function(btn){
   };
 });
 
+// Ventas de antes de Bukéame (mudanza): aparte y sin sumar a los ingresos de aquí.
+async function loadVentasAntes(){
+  const box = document.getElementById('acctAntes');
+  const r = await api('GET','/mudanza/ventas');
+  if(!r.ok || !r.data.meses || !r.data.meses.length){ box.style.display='none'; return; }
+  const d = r.data;
+  const mes = function(m){ const p = m.split('-'); return new Date(Date.UTC(+p[0], +p[1]-1, 15)).toLocaleDateString('es-PR',{ month:'long', year:'numeric', timeZone:'UTC' }); };
+  const td = 'padding:8px 10px 8px 0;border-bottom:1px solid var(--line);font-size:13px';
+  box.innerHTML = '<div class="seclabel">Ventas antes de Bukéame</div>'+
+    '<p style="font-size:13px;color:var(--ink2);margin-bottom:10px;line-height:1.5">Las pasaste con la mudanza desde '+esc(d.fuentes.join(' y '))+'. Van aparte y no suman a tus ingresos de Bukéame, porque ya se reportaron allá. En total: <b>'+money(d.total_cents)+'</b>.</p>'+
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'+
+      ['Mes','Ventas','Total','Propinas','IVU'].map(function(h){ return '<th style="'+td+';text-align:left;font-size:11px;color:var(--ink2)">'+h+'</th>'; }).join('')+'</tr></thead><tbody>'+
+      d.meses.slice(0,24).map(function(m){ return '<tr><td style="'+td+'">'+esc(mes(m.mes))+'</td><td style="'+td+'">'+m.ventas+'</td><td style="'+td+'">'+money(m.total_cents)+'</td><td style="'+td+'">'+money(m.propinas_cents)+'</td><td style="'+td+'">'+money(m.ivu_cents)+'</td></tr>'; }).join('')+
+    '</tbody></table></div>'+
+    (d.meses.length>24?'<p style="font-size:12px;color:var(--ink2);margin-top:6px">Aquí salen los últimos 24 meses. El archivo los trae todos.</p>':'')+
+    '<button class="btn btn-ghost btn-sm" id="antesCsv" style="margin-top:12px">Descargar estas ventas (CSV)</button>';
+  box.style.display = 'block';
+  document.getElementById('antesCsv').onclick = async function(){
+    const btn = this; btn.disabled = true;
+    try {
+      const res = await fetch(API+'/mudanza/ventas.csv', { headers:{ 'Authorization':'Bearer '+token } });
+      if(!res.ok){ showAlert('acctAlert','No se pudo descargar', false); }
+      else {
+        const url = URL.createObjectURL(await res.blob());
+        const a = document.createElement('a'); a.href = url; a.download = 'bukeame-ventas-antes.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      }
+    } catch(e){ showAlert('acctAlert','No se pudo descargar', false); }
+    btn.disabled = false;
+  };
+}
+
 async function loadAccounting(){
   clearAlert('acctAlert');
+  loadVentasAntes().catch(function(){});
   const r = await api('GET','/accounting/summary?period='+acctPeriod);
   if(!r.ok){ showAlert('acctAlert', r.data.error || 'No se pudo cargar la contabilidad', false); return; }
   const d = r.data;

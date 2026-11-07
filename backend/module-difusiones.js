@@ -49,8 +49,11 @@ module.exports.mount = function (app, ctx) {
   // El sí que marcó el negocio solo vale con prueba de que la persona es su cliente.
   const PRUEBA_CLIENTE = (c) => `(EXISTS (SELECT 1 FROM appointments ap WHERE ap.client_id = ${c}.id AND ap.business_id = ${c}.business_id
                     AND ap.status = 'completed' AND ap.source = 'online')
-      OR EXISTS (SELECT 1 FROM message_log ml WHERE ml.business_id = ${c}.business_id AND ml.channel = 'whatsapp'
-                    AND ml.recipient = ${c}.phone AND ml.status IN ('sent','delivered') AND ml.appointment_id IS NOT NULL))`;
+      OR EXISTS (SELECT 1 FROM message_log ml JOIN appointments ma ON ma.id = ml.appointment_id
+                  WHERE ml.business_id = ${c}.business_id AND ml.channel = 'whatsapp'
+                    AND ml.recipient = ${c}.phone AND ml.status IN ('sent','delivered')
+                    -- una cita que llegó con la mudanza no prueba nada: la puso el negocio desde un archivo
+                    AND (to_jsonb(ma) ->> 'mudanza_id') IS NULL))`;
   // Quién puede recibir: aceptó, no se dio de baja después, no está bloqueado, ya fue
   // atendido alguna vez y, si el sí lo puso el negocio, hay prueba de que es su cliente.
   const PUEDE_RECIBIR = (c) => `(${c}.wa_promo_opt_in_at IS NOT NULL

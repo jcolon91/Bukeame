@@ -277,7 +277,10 @@ app.post('/api/payments/stripe/webhook',
 app.use('/api/voz', express.json({ limit: '5mb', verify: (req, _res, buf) => { req.rawBody = buf; } }));
 // El webhook del cobro con tarjeta (module-tarjeta) también necesita los bytes exactos.
 app.use('/api/billing/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }));
-app.use(express.json({ limit: '1mb' }));
+// La mudanza lee su propio cuerpo (hasta 25 MB, las filas de los archivos del negocio) en sus
+// rutas, después de revisar la sesión; aquí no se lee para que nadie sin cuenta haga procesar 25 MB.
+const jsonNormal = express.json({ limit: '1mb' });
+app.use((req, res, next) => (req.path.startsWith('/api/mudanza') ? next() : jsonNormal(req, res, next)));
 
 // --- Uploads (logos de negocios) ---
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -3554,11 +3557,12 @@ app.get('/api/clients', authRequired, businessScope, asyncH(async (req, res) => 
   const vals = [req.business.id];
   let where = '';
   if (isStr(req.query.q, 80)) { vals.push(req.query.q.trim()); where = ` AND (full_name % $2 OR phone LIKE '%' || $2 || '%')`; }
+  // Con la mudanza, los que llegaron de otra plataforma se ordenan por su última visita de allá.
   const { rows } = await db.query(
     `SELECT id, full_name, phone, email, notes, no_show_count, total_visits, total_spent_cents,
-            last_visit_at, is_blocked
+            last_visit_at, is_blocked${MUD_V1 ? ', import_source, imported_visits, imported_last_visit_at' : ''}
        FROM clients WHERE business_id = $1 ${where}
-      ORDER BY last_visit_at DESC NULLS LAST LIMIT 50`, vals);
+      ORDER BY ${MUD_V1 ? 'COALESCE(last_visit_at, imported_last_visit_at)' : 'last_visit_at'} DESC NULLS LAST LIMIT 50`, vals);
   res.json({ clients: rows });
 }));
 
@@ -3586,8 +3590,9 @@ app.get('/api/clients/:id', authRequired, businessScope, asyncH(async (req, res)
       const p = await db.query(
         `SELECT EXISTS (SELECT 1 FROM appointments ap WHERE ap.client_id = $1 AND ap.business_id = $2 AND ap.status = 'completed') AS atendido,
                 (EXISTS (SELECT 1 FROM appointments ap WHERE ap.client_id = $1 AND ap.business_id = $2 AND ap.status = 'completed' AND ap.source = 'online')
-                 OR EXISTS (SELECT 1 FROM message_log ml WHERE ml.business_id = $2 AND ml.channel = 'whatsapp' AND ml.recipient = $3
-                              AND ml.status IN ('sent','delivered') AND ml.appointment_id IS NOT NULL)) AS prueba`,
+                 OR EXISTS (SELECT 1 FROM message_log ml JOIN appointments ma ON ma.id = ml.appointment_id
+                             WHERE ml.business_id = $2 AND ml.channel = 'whatsapp' AND ml.recipient = $3
+                               AND ml.status IN ('sent','delivered') AND (to_jsonb(ma) ->> 'mudanza_id') IS NULL)) AS prueba`,
         [client.id, req.business.id, client.phone]).catch(() => ({ rows: [{ atendido: true, prueba: true }] }));
       client.wa_promo.ready = !!(p.rows[0].atendido && (client.wa_promo.source !== 'negocio' || p.rows[0].prueba));
       client.wa_promo.missing = !p.rows[0].atendido ? 'cita' : (client.wa_promo.ready ? null : 'prueba');
@@ -3631,12 +3636,24 @@ app.get('/api/clients/:id', authRequired, businessScope, asyncH(async (req, res)
         WHERE lp.business_id = $1`, [req.business.id, client.id]),
   ]);
 
+  // Antes de Bukéame (mudanza): su resumen y sus visitas de la otra plataforma. No son citas.
+  let antes = null;
+  if (raw.import_source || raw.imported_visits != null) {
+    const hist = await db.query(
+      `SELECT occurred_at, service_name, staff_name, price_cents, status FROM client_import_history
+        WHERE client_id = $1 AND business_id = $2 ORDER BY occurred_at DESC LIMIT 30`, [client.id, req.business.id])
+      .catch(() => ({ rows: [] }));
+    antes = { source: raw.import_source || null, visits: raw.imported_visits, spent_cents: raw.imported_spent_cents != null ? Number(raw.imported_spent_cents) : null,
+      last_visit_at: raw.imported_last_visit_at || null, history: hist.rows };
+  }
+
   res.json({
     client,
     upcoming: upcoming.rows,
     past: past.rows,
     gift_cards: gifts.rows,
     loyalty: loyalty.rows[0] || null,
+    antes,
   });
 }));
 
@@ -3765,6 +3782,8 @@ function buildMessage(template, ctx) {
   // lejanos. Si el negocio no puso ubicación (lat/lng null), no aparece ningún pin.
   const loc = (biz.address_line ? `📍 ${biz.address_line}\n` : '')
     + (biz.lat != null && biz.lng != null ? `🗺 Cómo llegar: https://www.google.com/maps/search/?api=1&query=${biz.lat},${biz.lng}\n` : '');
+  // Primer aviso de una cita que llegó con la mudanza (ver dispatchBatch).
+  const intro = ctx.presentar ? `👋 Ahora tus citas con *${biz.name}* llegan por Bukéame.\n\n` : '';
   switch (template) {
     case 'confirm':
       return `✅ *${biz.name}*\nTu cita quedó ${appt.status === 'pending_deposit' ? 'reservada (pendiente de depósito)' : 'confirmada'}:\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 Código: ${appt.confirmation_code}\n`
@@ -3782,13 +3801,13 @@ function buildMessage(template, ctx) {
     case 'hold_expired':
       return `⌛ *${biz.name}*\nTu reserva de *${appt.service_name}* (${when}) no quedó registrada: el depósito no se validó dentro de los 30 minutos y el turno se liberó.\n\nSi YA enviaste el depósito, contacta al negocio para que valide tu pago y te reubique${waLink ? `: ${waLink}` : ''}. Si no, puedes reservar de nuevo cuando quieras. 🙏`;
     case 'reminder_48h':
-      return `📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\n${contact}`;
+      return `${intro}📅 *${biz.name}*\nTu cita es en 2 días:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\n${contact}`;
     case 'reminder_24h':
-      return `⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\n${contact} 🙏`;
+      return `${intro}⏰ *Recordatorio — ${biz.name}*\nTu cita es mañana:\n\n💈 ${appt.service_name}\n🗓 ${when}\n\n${contact} 🙏`;
     case 'reminder_1h':
-      return `🔔 *${biz.name}*\n¡Te esperamos en 1 hora!\n\n💈 ${appt.service_name}\n🗓 ${when}`;
+      return `${intro}🔔 *${biz.name}*\n¡Te esperamos en 1 hora!\n\n💈 ${appt.service_name}\n🗓 ${when}`;
     case 'reminder_2h':
-      return `🔔 *${biz.name}*\n¡Te esperamos en 2 horas!\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}`;
+      return `${intro}🔔 *${biz.name}*\n¡Te esperamos en 2 horas!\n\n💈 ${appt.service_name}\n🗓 ${when}\n${loc}`;
     case 'manual_assign':
       return `✅ *${biz.name}*\n¡Te conseguimos turno!\n\n💈 ${appt.service_name}\n🗓 ${when}\n🎟 ${appt.confirmation_code}\n\nNos vemos. ${contact}`;
     case 'rescheduled':
@@ -4189,6 +4208,13 @@ checkMsgV2()
   .then(ok => { if (!ok) console.warn('⚠ Falta la migración 33: los avisos que fallen no se reintentan.'); })
   .catch(e => console.error('MSG_V2:', e.message));
 
+// Migración 40 (mudanza): de qué mudanza viene una cita y el resumen de antes de Bukéame
+// de cada cliente. Hasta que se corra, la cola y los clientes trabajan como antes.
+let MUD_V1 = false;
+db.query(`SELECT 1 FROM information_schema.columns WHERE table_name = 'appointments' AND column_name = 'mudanza_id'`)
+  .then(r => { MUD_V1 = r.rowCount > 0; })
+  .catch(e => console.error('MUD_V1:', e.message));
+
 // Avisos atados a una cita activa: si la cita ya pasó o se canceló antes de salir
 // (p.ej. mientras esperaba un reintento), no se mandan.
 const APPT_TEMPLATES = new Set(['confirm', 'reminder_48h', 'reminder_24h', 'reminder_2h', 'reminder_1h', 'manual_assign', 'rescheduled']);
@@ -4226,8 +4252,9 @@ async function dispatchMessages() {
 }
 async function dispatchBatch() {
   const { rows } = await db.query(
-    `SELECT m.id, m.channel, m.recipient, m.template, m.appointment_id, ${MSG_V2 ? 'm.attempts' : '0 AS attempts'},
+    `SELECT m.id, m.business_id, m.channel, m.recipient, m.template, m.appointment_id, ${MSG_V2 ? 'm.attempts' : '0 AS attempts'},
             a.starts_at, a.service_name, a.confirmation_code, a.status, a.deposit_cents,
+            ${MUD_V1 ? 'a.mudanza_id' : 'NULL::uuid AS mudanza_id'},
             b.name, b.slug, b.whatsapp, b.phone, b.ath_phone, b.address_line, b.lat, b.lng,
             w.id AS waitlist_id, w.offer_expires_at
        FROM message_log m
@@ -4267,6 +4294,16 @@ async function dispatchBatch() {
       offerMinutes: m.offer_expires_at ? Math.max(1, Math.round((new Date(m.offer_expires_at) - Date.now()) / 60_000)) : null,
     };
     if (m.series) ctx.series = m.series;
+    // Cita que llegó con la mudanza: si es lo primero que le escribimos a esa persona de
+    // parte de ese negocio, el aviso dice de dónde sale (no reservó por Bukéame).
+    if (m.mudanza_id && REMINDER_WINDOW_H[m.template]) {
+      try {
+        const antes = await db.query(
+          `SELECT 1 FROM message_log WHERE business_id = $1 AND recipient = $2 AND channel = $3
+              AND status IN ('sent','delivered') LIMIT 1`, [m.business_id, m.recipient, m.channel]);
+        ctx.presentar = !antes.rows[0];
+      } catch (e) { console.error('presentar:', e.message); }   // sin la línea, el aviso sale igual
+    }
     try {
       let out;
       if (m.channel === 'whatsapp') {
@@ -4748,6 +4785,14 @@ try {
   setTimeout(vuelta, pausa * 4.5);
 } catch (e) {
   console.error('⚠ Error montando las difusiones:', e.message);
+}
+// Mudanza: pasar servicios, clientes, citas, historial, ventas y saldos desde otra
+// plataforma. Cada hora se borran los borradores de más de 24 h (traen datos de clientes).
+try {
+  const mudanza = require('./module-mudanza').mount(app, { db, authRequired, businessScope, h: sharedHelpers });
+  setInterval(() => { mudanza.limpiar().catch(e => console.error('mudanza:', e.message)); }, 3600_000);
+} catch (e) {
+  console.error('⚠ Error montando la mudanza:', e.message);
 }
 
 // ============================================================================

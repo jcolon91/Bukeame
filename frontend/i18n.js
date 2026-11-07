@@ -17,7 +17,7 @@
     'Agenda':'Schedule','Servicios':'Services','Equipo':'Team','Clientes':'Clients','Lealtad':'Loyalty','Membresías':'Memberships',
     'Tienda':'Store','Lista de espera':'Waitlist','Órdenes':'Orders','Horario':'Hours','Contabilidad':'Accounting',
     'Mi negocio':'My business','Pagos':'Payments','Promociones':'Promotions','Marketing':'Marketing',
-    'Referidos':'Referrals','Mi cuenta':'My account','Kit de marca':'Brand kit','Cerrar sesión':'Log out',
+    'Referidos':'Referrals','Mudanza':'Move to Bukéame','Mudarme':'Move my data','Ahora no':'Not now','Antes de Bukéame':'Before Bukéame','Mi cuenta':'My account','Kit de marca':'Brand kit','Cerrar sesión':'Log out',
     // --- Acciones / botones ---
     'Reservar':'Book','Reservar ahora':'Book now','Reserva ahora':'Book now','Reserva':'Book',
     'Cancelar':'Cancel','Guardar':'Save','Guardar cambios':'Save changes','Confirmar':'Confirm','Aceptar':'Accept',
